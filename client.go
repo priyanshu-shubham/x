@@ -34,22 +34,36 @@ func GenerateResponse(client anthropic.Client, systemPrompt, userQuery string) (
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(userQuery)),
 		},
-		Temperature: anthropic.Float(0),
+		Temperature: anthropic.Float(0.05),
 	})
 
 	var response strings.Builder
+	var inputTokens, outputTokens int64
 
 	for stream.Next() {
 		event := stream.Current()
-		if event.Type == "content_block_delta" {
+		switch event.Type {
+		case "content_block_delta":
 			if event.Delta.Type == "text_delta" {
 				response.WriteString(event.Delta.Text)
 			}
+		case "message_delta":
+			inputTokens = event.Usage.InputTokens
+			outputTokens = event.Usage.OutputTokens
 		}
 	}
 
 	if err := stream.Err(); err != nil {
 		return "", err
+	}
+
+	// Track usage
+	if inputTokens > 0 || outputTokens > 0 {
+		usage, err := LoadUsage()
+		if err == nil {
+			usage.Add(inputTokens, outputTokens, 0)
+			usage.Save()
+		}
 	}
 
 	return strings.TrimSpace(response.String()), nil

@@ -11,6 +11,9 @@ func printUsage() {
 	fmt.Println("Usage: x <command>")
 	fmt.Println("       x configure     - Configure authentication")
 	fmt.Println("       x subcommands   - Edit custom subcommands")
+	fmt.Println("       x tokens        - Show token usage")
+	fmt.Println("       x upgrade       - Upgrade to latest version")
+	fmt.Println("       x version       - Show current version")
 	fmt.Println("       x <query>       - Generate and run a shell command")
 	fmt.Println("       x <subcommand>  - Run a custom subcommand")
 }
@@ -35,6 +38,26 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
+		return
+
+	case CmdTokens:
+		usage, err := LoadUsage()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading usage: %v\n", err)
+			os.Exit(1)
+		}
+		usage.Display()
+		return
+
+	case CmdUpgrade:
+		if err := RunUpgrade(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+
+	case CmdVersion:
+		fmt.Printf("x version %s\n", Version)
 		return
 	}
 

@@ -1,8 +1,11 @@
 package main
 
+// Version (set via ldflags during build)
+var Version = "dev"
+
 // Model constants
 const (
-	DefaultModel    = "claude-sonnet-4-5@20250929"
+	DefaultModel     = "claude-sonnet-4-5@20250929"
 	DefaultMaxTokens = 1024
 )
 
@@ -25,6 +28,15 @@ const (
 const (
 	CmdConfigure   = "configure"
 	CmdSubcommands = "subcommands"
+	CmdTokens      = "tokens"
+	CmdUpgrade     = "upgrade"
+	CmdVersion     = "version"
+)
+
+// GitHub repository
+const (
+	GitHubOwner = "priyanshu-shubham"
+	GitHubRepo  = "x"
 )
 
 // Default shells by OS

@@ -134,6 +134,35 @@ journal:
     Help me reflect on what I describe.
 ```
 
+## Upgrade
+
+Update to the latest version:
+
+```
+$ x upgrade
+Current version: v0.1.0
+Checking for updates...
+Latest version: v0.2.0
+Downloading x_darwin_arm64.tar.gz...
+Upgraded to v0.2.0
+```
+
+Check current version with `x version`.
+
+## Token usage
+
+Track how many tokens you've used:
+
+```
+$ x tokens
+Token Usage
+-----------
+Input tokens:    1250
+Output tokens:   380
+Total tokens:    1630
+Requests:        12
+```
+
 ## Config location
 
 Everything lives in your system's config directory:
@@ -142,9 +171,10 @@ Everything lives in your system's config directory:
 - Linux: `~/.config/x/`
 - Windows: `%LOCALAPPDATA%\x\`
 
-Two files:
+Files:
 - `config.json` - Your API credentials
 - `subcommands.yaml` - Your custom subcommands
+- `usage.json` - Token usage stats
 
 ## Tips
 
