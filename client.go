@@ -48,15 +48,17 @@ func GenerateResponse(client anthropic.Client, systemPrompt, userQuery string) (
 				response.WriteString(event.Delta.Text)
 			}
 		case "message_start":
-			if event.Message.Usage.CacheCreationInputTokens > 0 {
-				cacheCreationTokens = event.Message.Usage.CacheCreationInputTokens
-			}
-			if event.Message.Usage.CacheReadInputTokens > 0 {
-				cacheReadTokens = event.Message.Usage.CacheReadInputTokens
-			}
+			// Accumulate tokens from message start
+			inputTokens += event.Message.Usage.InputTokens
+			outputTokens += event.Message.Usage.OutputTokens
+			cacheCreationTokens += event.Message.Usage.CacheCreationInputTokens
+			cacheReadTokens += event.Message.Usage.CacheReadInputTokens
 		case "message_delta":
-			inputTokens = event.Usage.InputTokens
-			outputTokens = event.Usage.OutputTokens
+			// Accumulate tokens from message delta
+			inputTokens += event.Usage.InputTokens
+			outputTokens += event.Usage.OutputTokens
+			cacheCreationTokens += event.Usage.CacheCreationInputTokens
+			cacheReadTokens += event.Usage.CacheReadInputTokens
 		}
 	}
 

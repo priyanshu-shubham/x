@@ -149,19 +149,27 @@ Upgraded to v0.2.0
 
 Check current version with `x version`.
 
-## Token usage
+## Usage stats
 
-Track how many tokens you've used:
+Track how many tokens you've used and the estimated cost:
 
 ```
-$ x tokens
+$ x usage
 Token Usage
 -----------
-Input tokens:    1250
-Output tokens:   380
-Total tokens:    1630
-Requests:        12
+Input tokens:          1250
+Output tokens:         380
+Total tokens:          1630
+Requests:              12
+
+Estimated Cost
+--------------
+Input cost:            $0.0038
+Output cost:           $0.0057
+Total cost:            $0.0095
 ```
+
+Pricing is fetched dynamically from [LiteLLM's pricing data](https://github.com/BerriAI/litellm).
 
 ## Config location
 
