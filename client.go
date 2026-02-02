@@ -34,6 +34,7 @@ func GenerateResponse(client anthropic.Client, systemPrompt, userQuery string) (
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(userQuery)),
 		},
+		Temperature: anthropic.Float(0),
 	})
 
 	var response strings.Builder
