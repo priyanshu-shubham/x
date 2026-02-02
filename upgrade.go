@@ -233,14 +233,12 @@ func RunUpgrade() error {
 	}
 
 	// Replace the binary
-	// On Windows, we can't replace a running executable directly
-	if runtime.GOOS == OSWindows {
-		// Rename current exe to .old
-		oldPath := currentExe + ".old"
-		os.Remove(oldPath) // Remove any existing .old file
-		if err := os.Rename(currentExe, oldPath); err != nil {
-			return fmt.Errorf("failed to backup current binary: %w", err)
-		}
+	// On Linux and Windows, we can't overwrite a running executable directly.
+	// Remove/rename the old binary first, then place the new one at the same path.
+	oldPath := currentExe + ".old"
+	os.Remove(oldPath) // Remove any existing .old file
+	if err := os.Rename(currentExe, oldPath); err != nil {
+		return fmt.Errorf("failed to backup current binary: %w", err)
 	}
 
 	// Copy new binary
@@ -250,8 +248,13 @@ func RunUpgrade() error {
 	}
 
 	if err := os.WriteFile(currentExe, newBinary, 0755); err != nil {
+		// Try to restore the old binary on failure
+		os.Rename(oldPath, currentExe)
 		return fmt.Errorf("failed to install new binary: %w", err)
 	}
+
+	// Clean up the old binary (best-effort)
+	os.Remove(oldPath)
 
 	fmt.Printf("Upgraded to %s\n", latestVersion)
 	return nil
