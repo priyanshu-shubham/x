@@ -69,11 +69,11 @@ func RunSubcommandsEditor() error {
 }
 
 // RunSubcommand executes a custom subcommand
-func RunSubcommand(client anthropic.Client, subcmd Subcommand, args []string) error {
+func RunSubcommand(client anthropic.Client, authType AuthType, subcmd Subcommand, args []string) error {
 	query := strings.Join(args, " ")
 	systemPrompt := ApplyTemplate(subcmd.Prompt)
 
-	response, err := GenerateResponse(client, systemPrompt, query)
+	response, err := GenerateResponse(client, authType, systemPrompt, query)
 	if err != nil {
 		return err
 	}
@@ -83,10 +83,10 @@ func RunSubcommand(client anthropic.Client, subcmd Subcommand, args []string) er
 }
 
 // RunShellGeneration generates and optionally runs a shell command
-func RunShellGeneration(client anthropic.Client, query string) error {
+func RunShellGeneration(client anthropic.Client, authType AuthType, query string) error {
 	systemPrompt := GetDefaultSystemPrompt()
 
-	command, err := GenerateResponse(client, systemPrompt, query)
+	command, err := GenerateResponse(client, authType, systemPrompt, query)
 	if err != nil {
 		return fmt.Errorf("error generating command: %w", err)
 	}

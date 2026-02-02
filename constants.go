@@ -5,8 +5,9 @@ var Version = "dev"
 
 // Model constants
 const (
-	DefaultModel     = "claude-sonnet-4-5@20250929"
-	DefaultMaxTokens = 1024
+	DefaultModelAPI    = "claude-sonnet-4-5-20250929"
+	DefaultModelVertex = "claude-sonnet-4-5@20250929"
+	DefaultMaxTokens   = 1024
 )
 
 // AuthType represents the authentication method

@@ -21,12 +21,20 @@ func CreateClient(ctx context.Context, config *Config) (anthropic.Client, error)
 	}
 }
 
+// ModelForAuth returns the correct model name format for the given auth type.
+func ModelForAuth(authType AuthType) string {
+	if authType == AuthTypeVertex {
+		return DefaultModelVertex
+	}
+	return DefaultModelAPI
+}
+
 // GenerateResponse sends a prompt to the model and returns the response
-func GenerateResponse(client anthropic.Client, systemPrompt, userQuery string) (string, error) {
+func GenerateResponse(client anthropic.Client, authType AuthType, systemPrompt, userQuery string) (string, error) {
 	ctx := context.Background()
 
 	stream := client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
-		Model:     DefaultModel,
+		Model:     anthropic.Model(ModelForAuth(authType)),
 		MaxTokens: DefaultMaxTokens,
 		System: []anthropic.TextBlockParam{
 			{Text: systemPrompt},

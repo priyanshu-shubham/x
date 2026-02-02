@@ -34,19 +34,18 @@ func FetchModelPricing() (*ModelPricing, error) {
 		return nil, err
 	}
 
-	// Generate possible key formats from DefaultModel
-	// DefaultModel format: "claude-sonnet-4-5@20250929"
-	keysToTry := []string{DefaultModel}
+	// Generate possible key formats from DefaultModelAPI
+	// DefaultModelAPI format: "claude-sonnet-4-5-20250929"
+	keysToTry := []string{
+		DefaultModelAPI,
+		DefaultModelVertex,
+		"anthropic." + DefaultModelAPI + "-v1:0",
+	}
 
-	// Without @version suffix
-	if idx := strings.Index(DefaultModel, "@"); idx != -1 {
-		base := DefaultModel[:idx]
-		version := DefaultModel[idx+1:]
+	// Also try base name without version (e.g. "claude-sonnet-4-5")
+	if idx := strings.LastIndex(DefaultModelAPI, "-"); idx != -1 {
+		base := DefaultModelAPI[:idx]
 		keysToTry = append(keysToTry, base)
-		// With dash instead of @
-		keysToTry = append(keysToTry, base+"-"+version)
-		// With anthropic prefix
-		keysToTry = append(keysToTry, "anthropic."+base+"-"+version+"-v1:0")
 	}
 
 	for _, key := range keysToTry {
@@ -55,7 +54,7 @@ func FetchModelPricing() (*ModelPricing, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("pricing not found for model %s", DefaultModel)
+	return nil, fmt.Errorf("pricing not found for model %s", DefaultModelAPI)
 }
 
 // Usage tracks cumulative token usage

@@ -91,7 +91,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err := RunSubcommand(client, subcmd, os.Args[2:]); err != nil {
+		if err := RunSubcommand(client, config.AuthType, subcmd, os.Args[2:]); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -100,7 +100,7 @@ func main() {
 
 	// Default: generate shell command
 	query := strings.Join(os.Args[1:], " ")
-	if err := RunShellGeneration(client, query); err != nil {
+	if err := RunShellGeneration(client, config.AuthType, query); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
