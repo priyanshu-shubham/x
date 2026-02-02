@@ -28,7 +28,7 @@ const (
 const (
 	CmdConfigure   = "configure"
 	CmdSubcommands = "subcommands"
-	CmdTokens      = "tokens"
+	CmdUsage       = "usage"
 	CmdUpgrade     = "upgrade"
 	CmdVersion     = "version"
 )

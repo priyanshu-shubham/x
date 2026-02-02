@@ -38,7 +38,7 @@ func GenerateResponse(client anthropic.Client, systemPrompt, userQuery string) (
 	})
 
 	var response strings.Builder
-	var inputTokens, outputTokens int64
+	var inputTokens, outputTokens, cacheCreationTokens, cacheReadTokens int64
 
 	for stream.Next() {
 		event := stream.Current()
@@ -46,6 +46,13 @@ func GenerateResponse(client anthropic.Client, systemPrompt, userQuery string) (
 		case "content_block_delta":
 			if event.Delta.Type == "text_delta" {
 				response.WriteString(event.Delta.Text)
+			}
+		case "message_start":
+			if event.Message.Usage.CacheCreationInputTokens > 0 {
+				cacheCreationTokens = event.Message.Usage.CacheCreationInputTokens
+			}
+			if event.Message.Usage.CacheReadInputTokens > 0 {
+				cacheReadTokens = event.Message.Usage.CacheReadInputTokens
 			}
 		case "message_delta":
 			inputTokens = event.Usage.InputTokens
@@ -61,7 +68,7 @@ func GenerateResponse(client anthropic.Client, systemPrompt, userQuery string) (
 	if inputTokens > 0 || outputTokens > 0 {
 		usage, err := LoadUsage()
 		if err == nil {
-			usage.Add(inputTokens, outputTokens, 0)
+			usage.Add(inputTokens, outputTokens, 0, cacheCreationTokens, cacheReadTokens)
 			usage.Save()
 		}
 	}

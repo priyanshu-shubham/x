@@ -108,7 +108,7 @@ func EnsureSubcommandsFile() (string, error) {
 // IsReservedCommand checks if a command name is reserved
 func IsReservedCommand(name string) bool {
 	switch name {
-	case CmdConfigure, CmdSubcommands, CmdTokens, CmdUpgrade, CmdVersion:
+	case CmdConfigure, CmdSubcommands, CmdUsage, CmdUpgrade, CmdVersion:
 		return true
 	default:
 		return false
