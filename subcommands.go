@@ -9,9 +9,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const subcommandsTemplate = `# X CLI Subcommands Configuration
+const commandsTemplate = `# X CLI Commands Configuration
 #
-# Define custom subcommands with step-based pipelines.
+# Define custom commands with step-based pipelines.
 # Each step can be: exec (shell), llm (single call), or agentic (multi-turn loop).
 #
 # Template variables available in prompts:
@@ -36,7 +36,7 @@ const subcommandsTemplate = `# X CLI Subcommands Configuration
 #     darwin: "cat file"     # macOS-specific
 #     linux: "cat file"      # Linux-specific
 #
-# Default subcommand (runs when no command matches):
+# Default command (runs when no command matches):
 default: shell
 
 # Shell command generation (the default behavior)
@@ -58,27 +58,27 @@ shell:
         command: "{{output}}"
         confirm: true
 
-# Create new subcommands using AI
+# Create new commands using AI
 new:
-  description: Create a new subcommand with AI assistance
+  description: Create a new command with AI assistance
   args:
     - name: description
-      description: What the new subcommand should do
+      description: What the new command should do
       rest: true
   steps:
     - id: current
       exec:
-        command: "cat ~/.config/x/subcommands.yaml"
-        darwin: "cat ~/Library/Application\\ Support/x/subcommands.yaml"
-        windows: "type %LOCALAPPDATA%\\x\\subcommands.yaml"
+        command: "cat ~/.config/x/commands.yaml"
+        darwin: "cat ~/Library/Application\\ Support/x/commands.yaml"
+        windows: "type %LOCALAPPDATA%\\x\\commands.yaml"
         silent: true
     - agentic:
         system: |
-          You are a helper that creates new subcommands for the x CLI tool.
+          You are a helper that creates new commands for the x CLI tool.
 
-          YAML SCHEMA FOR SUBCOMMANDS:
+          YAML SCHEMA FOR COMMANDS:
 
-          subcommand-name:
+          command-name:
             description: Short description shown in help
             args:                          # Optional: define named arguments
               - name: argname              # Referenced as args.argname in double braces
@@ -118,7 +118,7 @@ new:
           - Complex task: agentic with auto_execute: false for safety
 
           RULES:
-          1. Create valid YAML that can be appended to the subcommands file
+          1. Create valid YAML that can be appended to the commands file
           2. Use descriptive names (kebab-case)
           3. Write clear descriptions for help text
           4. Use OS-specific commands when needed (cat vs type, grep vs findstr)
@@ -127,20 +127,20 @@ new:
 
           Current OS: {{os}}
           Config file location:
-          - Linux: ~/.config/x/subcommands.yaml
-          - macOS: ~/Library/Application Support/x/subcommands.yaml
-          - Windows: %LOCALAPPDATA%\x\subcommands.yaml
+          - Linux: ~/.config/x/commands.yaml
+          - macOS: ~/Library/Application Support/x/commands.yaml
+          - Windows: %LOCALAPPDATA%\x\commands.yaml
 
           After creating the YAML, append it to the config file using echo/cat or appropriate command.
         prompt: |
-          Create a new subcommand for: {{args.description}}
+          Create a new command for: {{args.description}}
 
-          Current subcommands.yaml content:
+          Current commands.yaml content:
           {{steps.current.output}}
         max_iterations: 10
         auto_execute: false
 
-# Example: Simple LLM subcommand
+# Example: Simple LLM command
 # paraphrase:
 #   description: Paraphrase text to be clearer and more professional
 #   args:
@@ -214,9 +214,9 @@ type AgenticStep struct {
 	AutoExecute   bool   `yaml:"auto_execute"` // Auto-execute shell commands without confirmation
 }
 
-// SubcommandStep calls another subcommand
+// SubcommandStep calls another command
 type SubcommandStep struct {
-	Name   string   `yaml:"name"`   // Name of the subcommand to call
+	Name   string   `yaml:"name"`   // Name of the command to call
 	Args   []string `yaml:"args"`   // Arguments to pass (supports variable interpolation)
 	Silent bool     `yaml:"silent"` // Don't print output
 }
@@ -230,39 +230,39 @@ type Step struct {
 	Subcommand *SubcommandStep `yaml:"subcommand,omitempty"`
 }
 
-// Arg represents a named argument for a subcommand
+// Arg represents a named argument for a command
 type Arg struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
 	Rest        bool   `yaml:"rest"` // Capture remaining args as one string
 }
 
-// Subcommand represents a custom subcommand configuration
-type Subcommand struct {
+// Command represents a custom command configuration
+type Command struct {
 	Description string `yaml:"description"`
 	Args        []Arg  `yaml:"args"`
 	Steps       []Step `yaml:"steps"`
-	Source      string `yaml:"-"` // Where this subcommand was loaded from (not in YAML)
+	Source      string `yaml:"-"` // Where this command was loaded from (not in YAML)
 }
 
-// SubcommandsConfig holds all subcommands and the default
-type SubcommandsConfig struct {
-	Default     string
-	Subcommands map[string]Subcommand
+// CommandsConfig holds all commands and the default
+type CommandsConfig struct {
+	Default  string
+	Commands map[string]Command
 }
 
-// getSubcommandsPath returns the global subcommands config file path
-func getSubcommandsPath() (string, error) {
+// getCommandsPath returns the global commands config file path
+func getCommandsPath() (string, error) {
 	dir, err := getConfigDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, SubcommandsFileName), nil
+	return filepath.Join(dir, CommandsFileName), nil
 }
 
-// findAllLocalSubcommandsFiles searches for xcommands.yaml files from root to cwd
+// findAllLocalCommandsFiles searches for xcommands.yaml files from root to cwd
 // Returns paths ordered from root to current directory (so later ones override earlier)
-func findAllLocalSubcommandsFiles() []string {
+func findAllLocalCommandsFiles() []string {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil
@@ -288,7 +288,7 @@ func findAllLocalSubcommandsFiles() []string {
 	// Find xcommands.yaml files
 	var paths []string
 	for _, d := range dirs {
-		path := filepath.Join(d, LocalSubcommandsFileName)
+		path := filepath.Join(d, LocalCommandsFileName)
 		if _, err := os.Stat(path); err == nil {
 			paths = append(paths, path)
 		}
@@ -297,19 +297,19 @@ func findAllLocalSubcommandsFiles() []string {
 	return paths
 }
 
-// LoadSubcommandsConfig reads and merges subcommand configurations.
+// LoadCommandsConfig reads and merges command configurations.
 // Configs are merged with this precedence (later overrides earlier):
-// 1. Global subcommands.yaml
+// 1. Global commands.yaml
 // 2. Parent xcommands.yaml files (from root to current directory)
 // 3. Local xcommands.yaml (in current directory)
-func LoadSubcommandsConfig() (*SubcommandsConfig, error) {
-	config := &SubcommandsConfig{
-		Default:     "shell",
-		Subcommands: make(map[string]Subcommand),
+func LoadCommandsConfig() (*CommandsConfig, error) {
+	config := &CommandsConfig{
+		Default:  "shell",
+		Commands: make(map[string]Command),
 	}
 
 	// Load global config first
-	globalPath, err := getSubcommandsPath()
+	globalPath, err := getCommandsPath()
 	if err != nil {
 		return nil, err
 	}
@@ -317,11 +317,11 @@ func LoadSubcommandsConfig() (*SubcommandsConfig, error) {
 	globalData, err := os.ReadFile(globalPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Create the default subcommands file automatically
+			// Create the default commands file automatically
 			if err := os.MkdirAll(filepath.Dir(globalPath), DirPerms); err != nil {
 				return nil, err
 			}
-			if err := os.WriteFile(globalPath, []byte(subcommandsTemplate), SubcommandsPerms); err != nil {
+			if err := os.WriteFile(globalPath, []byte(commandsTemplate), CommandsPerms); err != nil {
 				return nil, err
 			}
 			globalData, err = os.ReadFile(globalPath)
@@ -339,7 +339,7 @@ func LoadSubcommandsConfig() (*SubcommandsConfig, error) {
 	}
 
 	// Load and merge all local xcommands.yaml files (root to cwd order)
-	localPaths := findAllLocalSubcommandsFiles()
+	localPaths := findAllLocalCommandsFiles()
 	for _, path := range localPaths {
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -359,7 +359,7 @@ func LoadSubcommandsConfig() (*SubcommandsConfig, error) {
 }
 
 // mergeConfig parses YAML data and merges it into the existing config
-func mergeConfig(config *SubcommandsConfig, data []byte, source string) error {
+func mergeConfig(config *CommandsConfig, data []byte, source string) error {
 	var raw map[string]any
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return err
@@ -373,37 +373,37 @@ func mergeConfig(config *SubcommandsConfig, data []byte, source string) error {
 		delete(raw, "default")
 	}
 
-	// Parse and merge subcommands
+	// Parse and merge commands
 	for name, value := range raw {
 		valueData, err := yaml.Marshal(value)
 		if err != nil {
 			continue
 		}
 
-		var subcmd Subcommand
-		if err := yaml.Unmarshal(valueData, &subcmd); err != nil {
+		var cmd Command
+		if err := yaml.Unmarshal(valueData, &cmd); err != nil {
 			continue
 		}
 
-		subcmd.Source = source
-		config.Subcommands[name] = subcmd
+		cmd.Source = source
+		config.Commands[name] = cmd
 	}
 
 	return nil
 }
 
-// LoadSubcommands reads and parses the subcommands configuration (legacy compatibility)
-func LoadSubcommands() (map[string]Subcommand, error) {
-	config, err := LoadSubcommandsConfig()
+// LoadCommands reads and parses the commands configuration (legacy compatibility)
+func LoadCommands() (map[string]Command, error) {
+	config, err := LoadCommandsConfig()
 	if err != nil {
 		return nil, err
 	}
-	return config.Subcommands, nil
+	return config.Commands, nil
 }
 
-// EnsureSubcommandsFile creates the subcommands file if it doesn't exist
-func EnsureSubcommandsFile() (string, error) {
-	path, err := getSubcommandsPath()
+// EnsureCommandsFile creates the commands file if it doesn't exist
+func EnsureCommandsFile() (string, error) {
+	path, err := getCommandsPath()
 	if err != nil {
 		return "", err
 	}
@@ -413,7 +413,7 @@ func EnsureSubcommandsFile() (string, error) {
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := os.WriteFile(path, []byte(subcommandsTemplate), SubcommandsPerms); err != nil {
+		if err := os.WriteFile(path, []byte(commandsTemplate), CommandsPerms); err != nil {
 			return "", err
 		}
 	}
@@ -424,30 +424,30 @@ func EnsureSubcommandsFile() (string, error) {
 // IsReservedCommand checks if a command name is reserved
 func IsReservedCommand(name string) bool {
 	switch name {
-	case CmdConfigure, CmdSubcommands, CmdUsage, CmdUpgrade, CmdVersion:
+	case CmdConfigure, CmdCommands, CmdUsage, CmdUpgrade, CmdVersion:
 		return true
 	default:
 		return false
 	}
 }
 
-// PrintHelp prints the main help message with all available subcommands
-func PrintHelp(config *SubcommandsConfig) {
+// PrintHelp prints the main help message with all available commands
+func PrintHelp(config *CommandsConfig) {
 	fmt.Println("Usage: x <command> [args]")
 	fmt.Println()
 	fmt.Println("Built-in commands:")
-	fmt.Println("  configure     Configure authentication")
-	fmt.Println("  subcommands   Edit custom subcommands")
-	fmt.Println("  usage         Show token usage and cost")
-	fmt.Println("  upgrade       Upgrade to latest version")
-	fmt.Println("  version       Show current version")
+	fmt.Println("  configure   Configure authentication")
+	fmt.Println("  commands    Edit custom commands")
+	fmt.Println("  usage       Show token usage and cost")
+	fmt.Println("  upgrade     Upgrade to latest version")
+	fmt.Println("  version     Show current version")
 	fmt.Println()
 
-	if len(config.Subcommands) > 0 {
-		// Group subcommands by source
+	if len(config.Commands) > 0 {
+		// Group commands by source
 		bySource := make(map[string][]string)
-		for name, subcmd := range config.Subcommands {
-			bySource[subcmd.Source] = append(bySource[subcmd.Source], name)
+		for name, cmd := range config.Commands {
+			bySource[cmd.Source] = append(bySource[cmd.Source], name)
 		}
 
 		// Sort sources: global first, then others alphabetically
@@ -465,9 +465,9 @@ func PrintHelp(config *SubcommandsConfig) {
 			return sources[i] < sources[j]
 		})
 
-		// Find max name length across all subcommands for alignment
+		// Find max name length across all commands for alignment
 		maxLen := 0
-		for name := range config.Subcommands {
+		for name := range config.Commands {
 			if len(name) > maxLen {
 				maxLen = len(name)
 			}
@@ -478,15 +478,15 @@ func PrintHelp(config *SubcommandsConfig) {
 			sort.Strings(names)
 
 			// Print source header
-			fmt.Printf("Subcommands (%s):\n", source)
+			fmt.Printf("Commands (%s):\n", source)
 
 			for _, name := range names {
-				subcmd := config.Subcommands[name]
-				desc := subcmd.Description
+				cmd := config.Commands[name]
+				desc := cmd.Description
 				if desc == "" {
 					desc = "(no description)"
 				}
-				// Mark default subcommand
+				// Mark default command
 				suffix := ""
 				if name == config.Default {
 					suffix = " (default)"
@@ -500,27 +500,27 @@ func PrintHelp(config *SubcommandsConfig) {
 	fmt.Println("Run 'x <command> --help' for command-specific help.")
 }
 
-// PrintSubcommandHelp prints help for a specific subcommand
-func PrintSubcommandHelp(name string, subcmd Subcommand) {
-	desc := subcmd.Description
+// PrintCommandHelp prints help for a specific command
+func PrintCommandHelp(name string, cmd Command) {
+	desc := cmd.Description
 	if desc == "" {
 		desc = "(no description)"
 	}
 	fmt.Printf("%s: %s\n", name, desc)
 
-	if len(subcmd.Args) > 0 {
+	if len(cmd.Args) > 0 {
 		fmt.Println()
 		fmt.Println("Arguments:")
 
 		// Find max arg name length for alignment
 		maxLen := 0
-		for _, arg := range subcmd.Args {
+		for _, arg := range cmd.Args {
 			if len(arg.Name) > maxLen {
 				maxLen = len(arg.Name)
 			}
 		}
 
-		for _, arg := range subcmd.Args {
+		for _, arg := range cmd.Args {
 			argDesc := arg.Description
 			if argDesc == "" {
 				argDesc = "(no description)"
@@ -536,7 +536,7 @@ func PrintSubcommandHelp(name string, subcmd Subcommand) {
 	// Show usage example
 	fmt.Println()
 	fmt.Printf("Usage: x %s", name)
-	for _, arg := range subcmd.Args {
+	for _, arg := range cmd.Args {
 		if arg.Rest {
 			fmt.Printf(" <%s>...", arg.Name)
 		} else {

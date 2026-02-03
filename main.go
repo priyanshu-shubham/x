@@ -9,11 +9,11 @@ import (
 func main() {
 	// Handle --help and -h flags
 	if len(os.Args) >= 2 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
-		config, _ := LoadSubcommandsConfig()
+		config, _ := LoadCommandsConfig()
 		if config == nil {
-			config = &SubcommandsConfig{
-				Default:     "shell",
-				Subcommands: make(map[string]Subcommand),
+			config = &CommandsConfig{
+				Default:  "shell",
+				Commands: make(map[string]Command),
 			}
 		}
 		PrintHelp(config)
@@ -30,8 +30,8 @@ func main() {
 			}
 			return
 
-		case CmdSubcommands:
-			if err := RunSubcommandsEditor(); err != nil {
+		case CmdCommands:
+			if err := RunCommandsEditor(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
 			}
@@ -59,29 +59,29 @@ func main() {
 		}
 	}
 
-	// Load subcommands configuration
-	subcommandsConfig, err := LoadSubcommandsConfig()
+	// Load commands configuration
+	commandsConfig, err := LoadCommandsConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading subcommands: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error loading commands: %v\n", err)
 		os.Exit(1)
 	}
 
 	// No args provided - show help or use default
 	if len(os.Args) < 2 {
-		PrintHelp(subcommandsConfig)
+		PrintHelp(commandsConfig)
 		os.Exit(1)
 	}
 
-	// Check if first arg is --help for a subcommand (e.g., "x subcmd --help")
+	// Check if first arg is --help for a command (e.g., "x cmd --help")
 	firstArg := os.Args[1]
 
-	// Check if first arg is a known subcommand
-	subcmd, isSubcommand := subcommandsConfig.Subcommands[firstArg]
+	// Check if first arg is a known command
+	cmd, isCommand := commandsConfig.Commands[firstArg]
 
-	if isSubcommand {
-		// Check for subcommand-specific help
+	if isCommand {
+		// Check for command-specific help
 		if len(os.Args) >= 3 && (os.Args[2] == "--help" || os.Args[2] == "-h") {
-			PrintSubcommandHelp(firstArg, subcmd)
+			PrintCommandHelp(firstArg, cmd)
 			return
 		}
 	}
@@ -103,27 +103,27 @@ func main() {
 	}
 
 	// Route to appropriate handler
-	if isSubcommand {
-		// Run the matched subcommand with remaining args
-		if _, err := RunPipeline(client, config.AuthType, subcommandsConfig, subcmd, os.Args[2:], false); err != nil {
+	if isCommand {
+		// Run the matched command with remaining args
+		if _, err := RunPipeline(client, config.AuthType, commandsConfig, cmd, os.Args[2:], false); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		return
 	}
 
-	// No subcommand matched - use default subcommand with all args
-	defaultSubcmd, hasDefault := subcommandsConfig.Subcommands[subcommandsConfig.Default]
+	// No command matched - use default command with all args
+	defaultCmd, hasDefault := commandsConfig.Commands[commandsConfig.Default]
 	if hasDefault {
-		// Use all args as input to the default subcommand
-		if _, err := RunPipeline(client, config.AuthType, subcommandsConfig, defaultSubcmd, os.Args[1:], false); err != nil {
+		// Use all args as input to the default command
+		if _, err := RunPipeline(client, config.AuthType, commandsConfig, defaultCmd, os.Args[1:], false); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 		return
 	}
 
-	// Fallback: no default subcommand configured, show help
+	// Fallback: no default command configured, show help
 	fmt.Fprintf(os.Stderr, "Unknown command: %s\n", firstArg)
 	fmt.Fprintf(os.Stderr, "Run 'x --help' to see available commands.\n")
 	os.Exit(1)

@@ -67,28 +67,28 @@ func NewPipelineContext() *PipelineContext {
 	}
 }
 
-// RunPipeline executes all steps in a subcommand pipeline
+// RunPipeline executes all steps in a command pipeline
 // Returns the final step's output and any error
 // If captureOutput is true, the last step will use streaming instead of interactive mode
-func RunPipeline(client anthropic.Client, authType AuthType, config *SubcommandsConfig, subcmd Subcommand, userArgs []string, captureOutput bool) (string, error) {
+func RunPipeline(client anthropic.Client, authType AuthType, config *CommandsConfig, cmd Command, userArgs []string, captureOutput bool) (string, error) {
 	ctx := NewPipelineContext()
 
 	if isDryRun() {
 		fmt.Println("[DRYRUN] Dry run mode - no commands will be executed")
 	}
 
-	debugLog("Starting pipeline with %d steps", len(subcmd.Steps))
+	debugLog("Starting pipeline with %d steps", len(cmd.Steps))
 	debugLog("User args: %v", userArgs)
 
 	// Parse arguments
-	if err := parseArgs(ctx, subcmd.Args, userArgs); err != nil {
+	if err := parseArgs(ctx, cmd.Args, userArgs); err != nil {
 		return "", err
 	}
 
 	debugLog("Parsed args: %v", ctx.Args)
 
 	// Execute each step
-	for i, step := range subcmd.Steps {
+	for i, step := range cmd.Steps {
 		var output string
 		var err error
 
@@ -97,7 +97,7 @@ func RunPipeline(client anthropic.Client, authType AuthType, config *Subcommands
 			stepID = fmt.Sprintf("step-%d", i+1)
 		}
 
-		isLastStep := i == len(subcmd.Steps)-1
+		isLastStep := i == len(cmd.Steps)-1
 
 		switch {
 		case step.Exec != nil:
@@ -182,7 +182,7 @@ func getOSCommand(step *ExecStep) string {
 
 // runExecStep executes a shell command step
 // If isLastStep is true and captureOutput is false, runs interactively with terminal connected
-// If captureOutput is true, always captures output (for subcommand chaining)
+// If captureOutput is true, always captures output (for command chaining)
 func runExecStep(ctx *PipelineContext, step *ExecStep, isLastStep bool, captureOutput bool) (string, error) {
 	command := getOSCommand(step)
 	command = interpolateVariables(command, ctx)
@@ -211,7 +211,7 @@ func runExecStep(ctx *PipelineContext, step *ExecStep, isLastStep bool, captureO
 	}
 
 	// For the last step without silent, run interactively with terminal connected
-	// Unless captureOutput is true (subcommand call), then use streaming to capture output
+	// Unless captureOutput is true (nested command call), then use streaming to capture output
 	if isLastStep && !step.Silent {
 		if !step.Confirm {
 			// Show the command being executed (confirm already showed it)
@@ -389,12 +389,12 @@ func runAgenticStep(client anthropic.Client, authType AuthType, ctx *PipelineCon
 	return lastTextBlock, nil
 }
 
-// runSubcommandStep executes another subcommand as a step
-func runSubcommandStep(client anthropic.Client, authType AuthType, config *SubcommandsConfig, ctx *PipelineContext, step *SubcommandStep) (string, error) {
-	// Look up the subcommand
-	subcmd, ok := config.Subcommands[step.Name]
+// runSubcommandStep executes another command as a step
+func runSubcommandStep(client anthropic.Client, authType AuthType, config *CommandsConfig, ctx *PipelineContext, step *SubcommandStep) (string, error) {
+	// Look up the command
+	cmd, ok := config.Commands[step.Name]
 	if !ok {
-		return "", fmt.Errorf("subcommand not found: %s", step.Name)
+		return "", fmt.Errorf("command not found: %s", step.Name)
 	}
 
 	// Interpolate args
@@ -405,21 +405,21 @@ func runSubcommandStep(client anthropic.Client, authType AuthType, config *Subco
 		args = append(args, interpolated)
 	}
 
-	debugLog("Calling subcommand: %s with args: %v", step.Name, args)
+	debugLog("Calling command: %s with args: %v", step.Name, args)
 
 	if isDryRun() {
-		fmt.Printf("[DRYRUN] Would call subcommand: %s %v\n", step.Name, args)
-		return "[dry run - no subcommand execution]", nil
+		fmt.Printf("[DRYRUN] Would call command: %s %v\n", step.Name, args)
+		return "[dry run - no command execution]", nil
 	}
 
 	if !step.Silent {
-		fmt.Printf("\n\033[1;35m❯ Running subcommand:\033[0m %s %s\n", step.Name, strings.Join(args, " "))
+		fmt.Printf("\n\033[1;35m❯ Running command:\033[0m %s %s\n", step.Name, strings.Join(args, " "))
 	}
 
-	// Run the subcommand pipeline
-	output, err := RunPipeline(client, authType, config, subcmd, args, true)
+	// Run the command pipeline
+	output, err := RunPipeline(client, authType, config, cmd, args, true)
 	if err != nil {
-		return "", fmt.Errorf("subcommand %s failed: %w", step.Name, err)
+		return "", fmt.Errorf("command %s failed: %w", step.Name, err)
 	}
 
 	return output, nil

@@ -10,10 +10,11 @@ $ x find files modified in the last day
 Run this command? [Y/n]:
 ```
 
-`x` does two things:
+`x` does three things:
 
 1. **Instant shell commands** - Describe what you want, get the right command for your OS
 2. **Custom workflows** - Build your own commands that chain shell scripts, LLM calls, and autonomous agents
+3. **Project command runner** - Define shortcuts in `xcommands.yaml` and run them with `x build`, `x test`, etc. Works without AI too - like npm scripts or Makefiles, but simpler
 
 ## Install
 
@@ -32,12 +33,12 @@ irm https://raw.githubusercontent.com/priyanshu-shubham/x/main/install.ps1 | iex
 go install github.com/priyanshu-shubham/x@latest
 ```
 
-Then configure your API key:
+**Optional:** Configure an API key if you want to use AI features:
 ```
 x configure
 ```
 
-You can use an Anthropic API key or Google Cloud Vertex AI.
+You can use an Anthropic API key or Google Cloud Vertex AI. Skip this if you only need the command runner.
 
 ## Basic usage
 
@@ -139,7 +140,7 @@ This generates a delete command with AI, shows it to you, and only runs it if yo
 
 ---
 
-## Three types of steps
+## Four types of steps
 
 ### 1. `exec` - Run shell commands
 
@@ -206,7 +207,7 @@ Claude will read files, understand the code, make changes, and verify they work 
 
 ### 4. `subcommand` - Reuse other commands
 
-Call another subcommand as a step. Great for composing complex workflows from simpler building blocks:
+Call another command as a step. Great for composing complex workflows from simpler building blocks:
 
 ```yaml
 review-and-fix:
@@ -227,7 +228,7 @@ review-and-fix:
 ```
 
 **Options:**
-- `name` - the subcommand to call
+- `name` - the command to call
 - `args` - list of arguments (supports variable interpolation)
 - `silent: true` - don't print "Running subcommand:" message
 
@@ -323,12 +324,12 @@ Here, `file` = `data.txt` and `query` = `find all the TODO comments`.
 
 ### Global config
 
-Your global subcommands live in:
-- **macOS:** `~/Library/Application Support/x/subcommands.yaml`
-- **Linux:** `~/.config/x/subcommands.yaml`
-- **Windows:** `%LOCALAPPDATA%\x\subcommands.yaml`
+Your global commands live in:
+- **macOS:** `~/Library/Application Support/x/commands.yaml`
+- **Linux:** `~/.config/x/commands.yaml`
+- **Windows:** `%LOCALAPPDATA%\x\commands.yaml`
 
-Edit with `x subcommands` to open in your default editor.
+Edit with `x commands` to open in your default editor.
 
 ### Project config
 
@@ -337,18 +338,34 @@ Create `xcommands.yaml` in any directory. Commands defined here are available wh
 **How merging works:**
 
 All configs are merged together. If you're in `/projects/myapp/src/`, x loads:
-1. Global `subcommands.yaml`
+1. Global `commands.yaml`
 2. `/projects/xcommands.yaml` (if it exists)
 3. `/projects/myapp/xcommands.yaml` (if it exists)
 
-Later files override earlier ones. Run `x --help` to see where each command comes from:
+Later files override earlier ones.
+
+**Setting a default command:**
+
+Add `default: <name>` at the top of your config to run that command when no command matches:
+
+```yaml
+default: shell
+
+shell:
+  description: Generate shell commands
+  # ...
+```
+
+Now `x find large files` runs the `shell` command with "find large files" as input.
+
+Run `x --help` to see where each command comes from:
 
 ```
-Subcommands (global):
+Commands (global):
   shell  Generate and run shell commands from natural language (default)
-  new    Create a new subcommand with AI assistance
+  new    Create a new command with AI assistance
 
-Subcommands (myapp):
+Commands (myapp):
   build  Build the project
   test   Run tests
 ```
@@ -497,7 +514,7 @@ fix:
 | Command | What it does |
 |---------|--------------|
 | `x configure` | Set up API credentials |
-| `x subcommands` | Edit global subcommands in your editor |
+| `x commands` | Edit global commands in your editor |
 | `x usage` | Show token usage and estimated cost |
 | `x upgrade` | Upgrade to the latest version |
 | `x version` | Show current version |

@@ -54,11 +54,11 @@ func RunConfigure() error {
 	return nil
 }
 
-// RunSubcommandsEditor opens the subcommands configuration file in an editor
-func RunSubcommandsEditor() error {
-	path, err := EnsureSubcommandsFile()
+// RunCommandsEditor opens the commands configuration file in an editor
+func RunCommandsEditor() error {
+	path, err := EnsureCommandsFile()
 	if err != nil {
-		return fmt.Errorf("failed to create subcommands file: %w", err)
+		return fmt.Errorf("failed to create commands file: %w", err)
 	}
 
 	fmt.Printf("Opening %s\n", path)

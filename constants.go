@@ -20,19 +20,19 @@ const (
 
 // Config file names
 const (
-	ConfigFileName           = "config.json"
-	SubcommandsFileName      = "subcommands.yaml"
-	LocalSubcommandsFileName = "xcommands.yaml"
-	AppConfigDir             = "x"
+	ConfigFileName          = "config.json"
+	CommandsFileName        = "commands.yaml"
+	LocalCommandsFileName   = "xcommands.yaml"
+	AppConfigDir            = "x"
 )
 
-// Command names (reserved - cannot be used as subcommand names)
+// Command names (reserved - cannot be used as custom command names)
 const (
-	CmdConfigure   = "configure"
-	CmdSubcommands = "subcommands"
-	CmdUsage       = "usage"
-	CmdUpgrade     = "upgrade"
-	CmdVersion     = "version"
+	CmdConfigure = "configure"
+	CmdCommands  = "commands"
+	CmdUsage     = "usage"
+	CmdUpgrade   = "upgrade"
+	CmdVersion   = "version"
 )
 
 // GitHub repository
@@ -74,9 +74,9 @@ const (
 
 // File permissions
 const (
-	ConfigFilePerms  = 0600
-	DirPerms         = 0755
-	SubcommandsPerms = 0644
+	ConfigFilePerms = 0600
+	DirPerms        = 0755
+	CommandsPerms   = 0644
 )
 
 // Pipeline/Agentic constants
