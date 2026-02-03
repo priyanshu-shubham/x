@@ -4,15 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 
-	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
 	"github.com/charmbracelet/glamour/styles"
-	"golang.org/x/term"
 )
 
 // RunConfigure handles the configure command
@@ -73,48 +69,13 @@ func RunSubcommandsEditor() error {
 	return nil
 }
 
-// RunSubcommand executes a custom subcommand
-func RunSubcommand(client anthropic.Client, authType AuthType, subcmd Subcommand, args []string) error {
-	query := strings.Join(args, " ")
-	systemPrompt := ApplyTemplate(subcmd.Prompt)
-
-	response, err := GenerateResponse(client, authType, systemPrompt, query)
-	if err != nil {
-		return err
-	}
-
-	// Get terminal width for markdown rendering
-	width := 80
-	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
-		width = w
-	}
-
-	renderer, err := glamour.NewTermRenderer(
-		glamour.WithStyles(getMarkdownStyle()),
-		glamour.WithWordWrap(width),
-	)
-	if err != nil {
-		// Fallback to plain text if renderer fails
-		fmt.Println(response)
-		return nil
-	}
-
-	rendered, err := renderer.Render(response)
-	if err != nil {
-		fmt.Println(response)
-		return nil
-	}
-
-	// Add vertical border to code blocks
-	rendered = addCodeBlockBorder(rendered)
-	fmt.Print(rendered)
-	return nil
-}
-
 // getMarkdownStyle returns a custom style for markdown rendering
 func getMarkdownStyle() ansi.StyleConfig {
 	// Start with Tokyo Night style as base
 	style := styles.DarkStyleConfig
+
+	// Small left indent for readability
+	style.Document.Margin = uintPtr(1)
 
 	// Remove header numbering by setting Format to empty
 	style.H1.Format = ""
@@ -210,37 +171,4 @@ func insertBarAfterIndent(line string, afterSpaces int) string {
 func stripAnsi(s string) string {
 	re := regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	return re.ReplaceAllString(s, "")
-}
-
-// RunShellGeneration generates and optionally runs a shell command
-func RunShellGeneration(client anthropic.Client, authType AuthType, query string) error {
-	systemPrompt := GetDefaultSystemPrompt()
-
-	command, err := GenerateResponse(client, authType, systemPrompt, query)
-	if err != nil {
-		return fmt.Errorf("error generating command: %w", err)
-	}
-
-	fmt.Printf("\n  %s\n\n", command)
-	fmt.Print("Run this command? [Y/n]: ")
-
-	reader := bufio.NewReader(os.Stdin)
-	response, _ := reader.ReadString('\n')
-	response = strings.TrimSpace(strings.ToLower(response))
-
-	if response == "" || response == "y" || response == "yes" {
-		fmt.Println()
-		err := RunShellCommand(command)
-		fmt.Println()
-		if err != nil {
-			if exitErr, ok := err.(*exec.ExitError); ok {
-				os.Exit(exitErr.ExitCode())
-			}
-			return err
-		}
-	} else {
-		fmt.Println("Cancelled.")
-	}
-
-	return nil
 }

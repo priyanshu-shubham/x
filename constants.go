@@ -20,9 +20,10 @@ const (
 
 // Config file names
 const (
-	ConfigFileName      = "config.json"
-	SubcommandsFileName = "subcommands.yaml"
-	AppConfigDir        = "x"
+	ConfigFileName           = "config.json"
+	SubcommandsFileName      = "subcommands.yaml"
+	LocalSubcommandsFileName = "xcommands.yaml"
+	AppConfigDir             = "x"
 )
 
 // Command names (reserved - cannot be used as subcommand names)
@@ -73,7 +74,15 @@ const (
 
 // File permissions
 const (
-	ConfigFilePerms = 0600
-	DirPerms        = 0755
+	ConfigFilePerms  = 0600
+	DirPerms         = 0755
 	SubcommandsPerms = 0644
+)
+
+// Pipeline/Agentic constants
+const (
+	DefaultMaxIterations = 10
+	AgenticMaxTokens     = 4096
+	ToolShell            = "shell"
+	ToolComplete         = "complete"
 )

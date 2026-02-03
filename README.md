@@ -1,202 +1,536 @@
 # x
 
-> Describe what you want in plain English, get the shell command. Build custom AI shortcuts too.
-
-Instead of googling "how to find files modified in the last 24 hours", just ask:
+Plain English to shell commands. Build custom AI workflows.
 
 ```
-x find files modified in the last day
-```
+$ x find files modified in the last day
 
-It shows you the command and asks if you want to run it.
-
-Create your own subcommands with custom prompts:
-
-```
-x explain "what is a mutex"
-x commit-msg "added JWT authentication"
-x translate-to-spanish "Hello, how are you?"
-```
-
-## Installation
-
-### macOS / Linux
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/priyanshu-shubham/x/main/install.sh | sh
-```
-
-### Windows (PowerShell)
-
-```powershell
-irm https://raw.githubusercontent.com/priyanshu-shubham/x/main/install.ps1 | iex
-```
-
-### Windows (Git Bash / WSL)
-
-Use the same command as macOS / Linux.
-
-### From source
-
-If you have Go installed:
-
-```bash
-go install github.com/priyanshu-shubham/x@latest
-```
-
-Or clone and build:
-
-```bash
-git clone https://github.com/priyanshu-shubham/x.git
-cd x
-go build -o x .
-```
-
-## Setup
-
-After installing, configure your API credentials:
-
-```
-x configure
-```
-
-You can use either an Anthropic API key or Google Cloud Vertex AI.
-
-That's it. Start using it:
-
-```
-x list all png files larger than 1mb
-```
-
-## How it works
-
-You type what you want in plain English. Claude generates the appropriate shell command for your OS. You see the command and can choose to run it or not (default is yes, just hit Enter).
-
-```
-$ x count lines of code in all python files
-
-  find . -name "*.py" -exec wc -l {} + | tail -1
+┃ find . -mtime -1 -type f
 
 Run this command? [Y/n]:
 ```
 
-Works on macOS, Linux, and Windows. It'll generate the right commands for your platform.
+`x` does two things:
 
-## Custom subcommands
+1. **Instant shell commands** - Describe what you want, get the right command for your OS
+2. **Custom workflows** - Build your own commands that chain shell scripts, LLM calls, and autonomous agents
 
-The real power is creating your own subcommands with custom prompts.
+## Install
 
-Run `x subcommands` to open the config file, then add something like:
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/priyanshu-shubham/x/main/install.sh | sh
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/priyanshu-shubham/x/main/install.ps1 | iex
+```
+
+**From source:**
+```bash
+go install github.com/priyanshu-shubham/x@latest
+```
+
+Then configure your API key:
+```
+x configure
+```
+
+You can use an Anthropic API key or Google Cloud Vertex AI.
+
+## Basic usage
+
+Just type `x` followed by what you want to do:
+
+```bash
+x list all png files larger than 1mb
+x find processes using port 3000
+x show disk usage sorted by size
+x compress all images in this folder
+```
+
+You'll see the command and can choose whether to run it.
+
+---
+
+## Tutorial: Build your first custom command
+
+Let's create a command that summarizes any file. By the end, you'll be able to run:
+
+```
+x summarize README.md
+```
+
+### Step 1: Create the config file
+
+Create a file called `xcommands.yaml` in your project folder:
+
+```yaml
+summarize:
+  description: Summarize any file
+  args:
+    - name: file
+      description: Path to the file
+  steps:
+    - exec:
+        command: cat {{args.file}}
+        silent: true
+    - llm:
+        system: Summarize the following content. Be concise.
+        prompt: "{{output}}"
+```
+
+That's it. Now `x summarize myfile.txt` will read the file and send it to Claude for summarization.
+
+### What's happening here?
+
+1. **args** defines what arguments your command takes. `{{args.file}}` gets replaced with whatever the user passes in.
+
+2. **steps** run in order. Each step can be:
+   - `exec` - run a shell command
+   - `llm` - call Claude
+   - `agentic` - let Claude run commands autonomously (more on this later)
+
+3. **silent: true** means don't print the output, just pass it to the next step.
+
+4. **{{output}}** contains whatever the previous step produced.
+
+### Step 2: Make it cross-platform
+
+The `cat` command doesn't work on Windows. Let's fix that:
+
+```yaml
+summarize:
+  description: Summarize any file
+  args:
+    - name: file
+      description: Path to the file
+  steps:
+    - exec:
+        command: cat {{args.file}}
+        windows: type {{args.file}}
+        silent: true
+    - llm:
+        system: Summarize the following content. Be concise.
+        prompt: "{{output}}"
+```
+
+Now it uses `type` on Windows and `cat` everywhere else. You can also specify `darwin` (macOS) and `linux` separately if needed.
+
+### Step 3: Add a confirmation step
+
+Want to review a command before it runs? Add `confirm: true`:
+
+```yaml
+delete-old:
+  description: Delete files older than 30 days
+  steps:
+    - llm:
+        system: Generate a command to delete files older than 30 days. Output only the command.
+        prompt: "Delete old files in {{directory}}"
+        silent: true
+    - exec:
+        command: "{{output}}"
+        confirm: true
+```
+
+This generates a delete command with AI, shows it to you, and only runs it if you approve.
+
+---
+
+## Three types of steps
+
+### 1. `exec` - Run shell commands
+
+```yaml
+steps:
+  - exec:
+      command: echo hello
+```
+
+**Options:**
+- `command` - the command to run (required)
+- `windows`, `darwin`, `linux` - OS-specific overrides
+- `silent: true` - capture output without printing it
+- `confirm: true` - ask before running
+
+When `silent` is false (the default), output streams to your terminal in real-time.
+
+### 2. `llm` - Call Claude
+
+```yaml
+steps:
+  - llm:
+      system: You are a helpful assistant.
+      prompt: "{{args.question}}"
+```
+
+**Options:**
+- `system` - the system prompt
+- `prompt` - the user prompt
+- `silent: true` - capture response without printing it
+
+### 3. `agentic` - Autonomous mode
+
+This is the powerful one. Claude gets access to a shell and can run commands on its own to complete complex tasks:
+
+```yaml
+fix:
+  description: Fix issues in the codebase
+  args:
+    - name: issue
+      description: What to fix
+      rest: true
+  steps:
+    - agentic:
+        system: |
+          You are a senior developer. Use shell commands to explore
+          the codebase and fix the issue. You have access to: {{os}}, {{shell}}
+          Current directory: {{directory}}
+        prompt: "{{args.issue}}"
+        max_iterations: 10
+        auto_execute: false
+```
+
+```
+$ x fix the login button is broken
+```
+
+Claude will read files, understand the code, make changes, and verify they work - asking for permission before each command (unless you set `auto_execute: true`).
+
+**Options:**
+- `system`, `prompt` - same as llm
+- `max_iterations` - how many commands Claude can run (default: 10)
+- `auto_execute: true` - run commands without asking (be careful!)
+
+### 4. `subcommand` - Reuse other commands
+
+Call another subcommand as a step. Great for composing complex workflows from simpler building blocks:
+
+```yaml
+review-and-fix:
+  description: Review code then fix issues
+  args:
+    - name: file
+      description: File to review and fix
+  steps:
+    - id: review
+      subcommand:
+        name: review
+        args:
+          - "{{args.file}}"
+    - subcommand:
+        name: fix
+        args:
+          - "Fix these issues in {{args.file}}: {{steps.review.output}}"
+```
+
+**Options:**
+- `name` - the subcommand to call
+- `args` - list of arguments (supports variable interpolation)
+- `silent: true` - don't print "Running subcommand:" message
+
+---
+
+## Passing data between steps
+
+### Using `{{output}}`
+
+The simplest way - each step can access the previous step's output:
+
+```yaml
+steps:
+  - exec:
+      command: git diff --cached
+      silent: true
+  - llm:
+      system: Generate a commit message for these changes.
+      prompt: "{{output}}"
+```
+
+### Using named steps
+
+When you need output from a specific step (not just the previous one), give it an `id`:
+
+```yaml
+steps:
+  - id: readme
+    exec:
+      command: cat README.md
+      silent: true
+  - id: changelog
+    exec:
+      command: cat CHANGELOG.md
+      silent: true
+  - llm:
+      system: Compare these two files.
+      prompt: |
+        README:
+        {{steps.readme.output}}
+
+        CHANGELOG:
+        {{steps.changelog.output}}
+```
+
+---
+
+## Available variables
+
+Use these anywhere in your prompts:
+
+| Variable | What it contains |
+|----------|------------------|
+| `{{args.name}}` | Argument passed by the user |
+| `{{output}}` | Output from the previous step |
+| `{{steps.id.output}}` | Output from a specific named step |
+| `{{directory}}` | Current working directory |
+| `{{os}}` | Operating system (darwin, linux, windows) |
+| `{{arch}}` | CPU architecture |
+| `{{shell}}` | User's shell |
+| `{{user}}` | Username |
+| `{{date}}` | Current date |
+| `{{time}}` | Current time |
+| `{{datetime}}` | Current date and time |
+
+---
+
+## Arguments
+
+Define what your command accepts:
+
+```yaml
+mycommand:
+  args:
+    - name: file
+      description: The file to process
+    - name: query
+      description: What to search for
+      rest: true
+```
+
+`rest: true` captures everything remaining as a single string. Useful for natural language input:
+
+```
+x mycommand data.txt find all the TODO comments
+```
+
+Here, `file` = `data.txt` and `query` = `find all the TODO comments`.
+
+---
+
+## Config files
+
+### Global config
+
+Your global subcommands live in:
+- **macOS:** `~/Library/Application Support/x/subcommands.yaml`
+- **Linux:** `~/.config/x/subcommands.yaml`
+- **Windows:** `%LOCALAPPDATA%\x\subcommands.yaml`
+
+Edit with `x subcommands` to open in your default editor.
+
+### Project config
+
+Create `xcommands.yaml` in any directory. Commands defined here are available when you're in that directory (or any subdirectory).
+
+**How merging works:**
+
+All configs are merged together. If you're in `/projects/myapp/src/`, x loads:
+1. Global `subcommands.yaml`
+2. `/projects/xcommands.yaml` (if it exists)
+3. `/projects/myapp/xcommands.yaml` (if it exists)
+
+Later files override earlier ones. Run `x --help` to see where each command comes from:
+
+```
+Subcommands (global):
+  shell  Generate and run shell commands from natural language (default)
+  new    Create a new subcommand with AI assistance
+
+Subcommands (myapp):
+  build  Build the project
+  test   Run tests
+```
+
+---
+
+## Create commands with AI
+
+Don't want to write YAML? Let Claude do it:
+
+```
+x new "a command that reviews my git diff and suggests improvements"
+```
+
+Claude will generate the YAML and add it to your config file.
+
+---
+
+## Debugging
+
+### See what's happening
+
+```bash
+DEBUG=1 x summarize README.md
+```
+
+Shows all the prompts being sent to Claude, step execution details, and more.
+
+### Dry run
+
+```bash
+DRYRUN=1 x "delete all tmp files"
+```
+
+Shows what would happen without actually running anything. Good for testing dangerous commands.
+
+### Combine them
+
+```bash
+DEBUG=1 DRYRUN=1 x fix "update the readme"
+```
+
+---
+
+## Example commands
+
+Here are some useful commands you can add to your config:
+
+### Git commit message generator
+
+```yaml
+commit:
+  description: Generate a commit message from staged changes
+  steps:
+    - exec:
+        command: git diff --cached
+        silent: true
+    - llm:
+        system: |
+          Generate a concise git commit message for these changes.
+          Use conventional commits (feat:, fix:, docs:, etc).
+          Output only the message.
+        prompt: "{{output}}"
+```
+
+### Code reviewer
+
+```yaml
+review:
+  description: Review a file for issues
+  args:
+    - name: file
+      description: File to review
+  steps:
+    - exec:
+        command: cat {{args.file}}
+        windows: type {{args.file}}
+        silent: true
+    - llm:
+        system: |
+          Review this code for bugs, security issues, and improvements.
+          Be specific and actionable.
+        prompt: "{{output}}"
+```
+
+### Explain code
 
 ```yaml
 explain:
-  prompt: |
-    Explain the following concept in simple terms.
-    Be concise and use examples where helpful.
-
-commit-msg:
-  prompt: |
-    Generate a concise git commit message for these changes.
-    Output only the message, nothing else.
+  description: Explain what a file does
+  args:
+    - name: file
+      description: File to explain
+  steps:
+    - exec:
+        command: cat {{args.file}}
+        windows: type {{args.file}}
+        silent: true
+    - llm:
+        system: Explain what this code does in plain English. Focus on the purpose, not line-by-line details.
+        prompt: "{{output}}"
 ```
 
-Now you can use them:
-
-```
-$ x explain "what is a mutex"
-A mutex (mutual exclusion) is like a bathroom key at a coffee shop...
-
-$ x commit-msg "added user authentication with JWT tokens"
-Add JWT-based user authentication
-```
-
-### Template variables
-
-You can use these in your prompts and they'll be replaced at runtime:
-
-- `{{time}}` - Current time (HH:MM:SS)
-- `{{date}}` - Current date (YYYY-MM-DD)
-- `{{datetime}}` - Both
-- `{{directory}}` - Current working directory
-- `{{os}}` - Operating system
-- `{{arch}}` - Architecture
-- `{{shell}}` - Your shell
-- `{{user}}` - Your username
-
-Example:
+### Quick question
 
 ```yaml
-journal:
-  prompt: |
-    You're helping me write a daily journal entry.
-    Today is {{date}} and the time is {{time}}.
-    I'm currently in {{directory}}.
-    Help me reflect on what I describe.
+q:
+  description: Ask a quick question
+  args:
+    - name: question
+      rest: true
+  steps:
+    - llm:
+        system: Answer concisely. Use code examples when helpful.
+        prompt: "{{args.question}}"
 ```
 
-## Upgrade
-
-Update to the latest version:
-
 ```
-$ x upgrade
-Current version: v0.1.0
-Checking for updates...
-Latest version: v0.2.0
-Downloading x_darwin_arm64.tar.gz...
-Upgraded to v0.2.0
+x q how do I reverse a string in python
 ```
 
-Check current version with `x version`.
+### Autonomous bug fixer
 
-## Usage stats
-
-Track how many tokens you've used and the estimated cost:
-
-```
-$ x usage
-Token Usage
------------
-Input tokens:          1250
-Output tokens:         380
-Total tokens:          1630
-Requests:              12
-
-Estimated Cost
---------------
-Input cost:            $0.0038
-Output cost:           $0.0057
-Total cost:            $0.0095
+```yaml
+fix:
+  description: Fix an issue in the codebase
+  args:
+    - name: issue
+      rest: true
+  steps:
+    - agentic:
+        system: |
+          You are a senior developer. Investigate and fix the issue.
+          Read files, understand the code, make changes, and verify they work.
+          Directory: {{directory}}
+          OS: {{os}}
+        prompt: "{{args.issue}}"
+        max_iterations: 15
+        auto_execute: false
 ```
 
-Pricing is fetched dynamically from [LiteLLM's pricing data](https://github.com/BerriAI/litellm).
+---
 
-## Config location
+## Built-in commands
 
-Everything lives in your system's config directory:
+| Command | What it does |
+|---------|--------------|
+| `x configure` | Set up API credentials |
+| `x subcommands` | Edit global subcommands in your editor |
+| `x usage` | Show token usage and estimated cost |
+| `x upgrade` | Upgrade to the latest version |
+| `x version` | Show current version |
+| `x --help` | List all available commands |
+| `x <cmd> --help` | Show help for a specific command |
 
-- macOS: `~/Library/Application Support/x/`
-- Linux: `~/.config/x/`
-- Windows: `%LOCALAPPDATA%\x\`
-
-Files:
-- `config.json` - Your API credentials
-- `subcommands.yaml` - Your custom subcommands
-- `usage.json` - Token usage stats
+---
 
 ## Tips
 
-- The default command (without a subcommand) always generates shell commands and asks before running
-- Custom subcommands just output text directly - useful for anything that isn't a shell command
-- If you mess up the subcommands.yaml, just delete it and run `x subcommands` to get a fresh template
+- **Start simple.** Get a basic command working, then add complexity.
+- **Use `silent: true`** for intermediate steps whose output you don't need to see.
+- **Use `confirm: true`** for any command that modifies or deletes things.
+- **Use `agentic` sparingly.** It's powerful but uses more tokens.
+- **Commit your `xcommands.yaml`** so your team can use the same commands.
+- **Messed up your config?** Delete it and run any command - it'll be recreated with defaults.
 
-## Releasing (for maintainers)
+---
 
-To create a new release:
+## Troubleshooting
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+**Command not found after install**
 
-GitHub Actions will automatically build binaries for all platforms and create a release.
+Make sure `~/.local/bin` (Linux/macOS) is in your PATH.
+
+**API errors**
+
+Run `x configure` to check your credentials. Make sure you have credits/quota remaining.
+
+**Config syntax errors**
+
+YAML is picky about indentation. Use 2 spaces, not tabs. Run with `DEBUG=1` to see parsing errors.
+
+**Command hangs**
+
+If running a long-lived process (like a server) as a non-final step, it will block. Long-running processes should be the last step, or run them in the background with `&`.

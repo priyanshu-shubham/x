@@ -1,0 +1,21 @@
+build:
+  description: Build the x binary
+  steps:
+    - exec:
+        command: "go build -o x ."
+
+release:
+  description: Release a new version (tag and push)
+  args:
+    - name: version
+      description: Version to release (e.g., v0.1.0)
+  steps:
+    - exec:
+        command: "git tag {{args.version}} && git push origin main && git push origin {{args.version}}"
+        confirm: true
+
+show-releases:
+  description: Show existing releases
+  steps:
+    - exec:
+        command: "git for-each-ref --sort=-v:refname --format='%(refname:short)  %(subject)' refs/tags"
