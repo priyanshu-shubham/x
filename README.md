@@ -1,6 +1,14 @@
-# x
+<p align="center">
+  <img src="docs/public/logo.svg" width="80" height="80" alt="x logo">
+</p>
 
-Plain English to shell commands. Build custom AI workflows.
+<h1 align="center">x</h1>
+
+<p align="center">
+  Plain English to shell commands. Build custom AI workflows.
+  <br>
+  <a href="https://priyanshu-shubham.github.io/x/"><strong>Documentation</strong></a>
+</p>
 
 ```
 $ x find files modified in the last day
