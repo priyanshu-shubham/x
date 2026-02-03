@@ -4,7 +4,8 @@ export default defineConfig({
   title: 'x',
   description: 'A simple command runner. Optionally supercharged with AI.',
 
-  
+  base: '/x/',
+
   head: [
     ['meta', { name: 'theme-color', content: '#10B981' }],
   ],
