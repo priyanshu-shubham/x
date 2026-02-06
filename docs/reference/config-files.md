@@ -57,14 +57,19 @@ Built-in commands:
   upgrade     Upgrade to latest version
   version     Show version
 
-Commands (global):
+Commands (built-in):
   shell       Generate shell commands from natural language (default)
   new         Create a new command with AI assistance
+
+Commands (global):
+  mycommand   A custom command you added
 
 Commands (myapp):
   build       Build the project
   test        Run tests
 ```
+
+The `shell` and `new` commands are built into the binary and automatically updated when you upgrade `x`. You can override them in your config if you want custom behavior.
 
 ## File format
 
@@ -97,23 +102,37 @@ The `default` field specifies which command runs when no match is found:
 
 ```yaml
 default: shell
+```
 
-shell:
-  description: Generate shell commands
+The built-in `shell` command is the default, so `x find large files` generates and runs a shell command.
+
+You can set a different default:
+
+```yaml
+default: ask
+
+ask:
+  description: Ask a question
   args:
-    - name: prompt
+    - name: question
       rest: true
   steps:
     - llm:
-        system: Generate a shell command for the user's request.
-        prompt: "{{args.prompt}}"
+        prompt: "{{args.question}}"
 ```
 
-Now `x find large files` runs the `shell` command with "find large files" as the prompt.
+## Built-in commands
+
+The `shell` and `new` commands are built into the binary and always available:
+
+- **shell** - Generate and run shell commands from natural language (with safety info)
+- **new** - Create new commands with AI assistance
+
+These are automatically updated when you upgrade `x`. You can override them in your config if you want custom behavior.
 
 ## Auto-created config
 
-If the global config doesn't exist, it's created automatically with default commands (`shell` and `new`) the first time you run `x`.
+If the global config doesn't exist, it's created automatically with examples the first time you run `x`.
 
 ## Config tips
 

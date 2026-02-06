@@ -1,0 +1,134 @@
+# Built-in commands - embedded in the binary and always up-to-date
+# Users can override these in their commands.yaml
+
+shell:
+  description: Generate and run shell commands from natural language
+  args:
+    - name: query
+      description: What you want to do
+      rest: true
+  steps:
+    - llm:
+        system: |
+          You are a command-line assistant. Generate shell commands with safety information.
+          Environment: {{os}}, {{arch}}, {{directory}}, {{shell}}
+
+          OUTPUT FORMAT: Return a JSON object with these fields:
+          {
+            "command": "<the shell command>",
+            "summary": "<one-line description of what it does>",
+            "risk": "<none|low|medium|high> - <brief reason if not none>",
+            "safer": "<alternative command if risk is medium/high, empty string if not needed>"
+          }
+
+          RISK LEVELS:
+          - none: Read-only, informational (ls, cat, grep, ps, echo)
+          - low: Minor changes, easily reversible (touch, mkdir, git add)
+          - medium: Significant changes, hard to undo (rm files, git reset, package install)
+          - high: Destructive/irreversible (rm -rf, kill -9, drop table, format)
+
+          GUIDELINES:
+          - Generate the exact command the user asked for
+          - Be accurate about what the command does and its consequences
+          - For high-risk commands, suggest safer alternatives in the "safer" field
+          - Examples of safer alternatives:
+            * kill -9 -> kill -15 first (graceful shutdown)
+            * rm -rf -> mv to trash or backup first
+            * git reset --hard -> git stash first
+            * DROP TABLE -> backup first
+
+          OUTPUT ONLY THE JSON OBJECT. No markdown, no extra text.
+        prompt: "{{args.query}}"
+        silent: true
+    - exec:
+        command: "{{output.command}}"
+        summary: "{{output.summary}}"
+        risk: "{{output.risk}}"
+        safer: "{{output.safer}}"
+        confirm: true
+
+new:
+  description: Create a new command with AI assistance
+  args:
+    - name: description
+      description: What the new command should do
+      rest: true
+  steps:
+    - id: current
+      exec:
+        command: "cat ~/.config/x/commands.yaml"
+        darwin: "cat ~/Library/Application\\ Support/x/commands.yaml"
+        windows: "type %LOCALAPPDATA%\\x\\commands.yaml"
+        silent: true
+    - agentic:
+        system: |
+          You are a helper that creates new commands for the x CLI tool.
+
+          YAML SCHEMA FOR COMMANDS:
+
+          command-name:
+            description: Short description shown in help
+            args:                          # Optional: define named arguments
+              - name: argname              # Referenced as args.argname in double braces
+                description: What this arg is for
+                rest: true                 # Optional: captures all remaining args
+            steps:                         # List of steps to execute in order
+              - llm:                       # Single LLM call
+                  system: "System prompt"
+                  prompt: "User prompt"
+              - exec:                      # Shell command
+                  command: "default cmd"   # Required: default command
+                  windows: "win cmd"       # Optional: Windows-specific
+                  darwin: "mac cmd"        # Optional: macOS-specific
+                  linux: "linux cmd"       # Optional: Linux-specific
+                  confirm: true            # Optional: ask before running (default: false)
+                  summary: "..."           # Optional: shown before confirm (supports interpolation)
+                  risk: "..."              # Optional: risk level shown before confirm
+                  safer: "..."             # Optional: safer alternative for risky commands
+              - agentic:                   # Multi-turn with shell access
+                  system: "System prompt"
+                  prompt: "User prompt"
+                  max_iterations: 10       # Optional (default: 10)
+                  auto_execute: false      # Optional: auto-run commands (default: false)
+
+          AVAILABLE TEMPLATE VARIABLES (use double curly braces):
+          - args.<name> - Named argument value
+          - output - Raw output from previous step
+          - output.<field> - JSON field from previous step (if output is JSON)
+          - steps.<id>.output - Output from named step (give step an id: field)
+          - steps.<id>.<field> - JSON field from named step
+          - directory, os, arch, shell, user - Environment info
+          - time, date, datetime - Current time/date
+
+          STEP TYPES:
+          1. llm: Single AI call. Good for text generation, explanations, summaries.
+          2. exec: Run shell command. Use for reading files, running tools. Add OS variants for cross-platform.
+          3. agentic: Multi-turn AI loop with shell access. Good for complex tasks needing multiple commands.
+
+          COMMON PATTERNS:
+          - Read file then analyze: exec (cat file) -> llm (analyze the output variable)
+          - Generate and run: llm (generate command as JSON) -> exec with confirm: true
+          - Complex task: agentic with auto_execute: false for safety
+
+          RULES:
+          1. Create valid YAML that can be appended to the commands file
+          2. Use descriptive names (kebab-case)
+          3. Write clear descriptions for help text
+          4. Use OS-specific commands when needed (cat vs type, grep vs findstr)
+          5. For dangerous operations, use confirm: true or auto_execute: false
+          6. Keep system prompts short and concise - no fluff, just clear instructions
+
+          Current OS: {{os}}
+          Config file location:
+          - Linux: ~/.config/x/commands.yaml
+          - macOS: ~/Library/Application Support/x/commands.yaml
+          - Windows: %LOCALAPPDATA%\x\commands.yaml
+
+          After creating the YAML, append it to the config file using echo/cat or appropriate command.
+        prompt: |
+          Create a new command for: {{args.description}}
+
+          Current commands.yaml content:
+          {{steps.current.output}}
+        max_iterations: 10
+        auto_execute: false

@@ -55,6 +55,29 @@ steps:
       prompt: "Summarize: {{output}}"
 ```
 
+### JSON field access
+
+If a step outputs JSON, access individual fields with <code v-pre>{{output.field}}</code>:
+
+```yaml
+steps:
+  - llm:
+      system: |
+        Return JSON: {"command": "...", "summary": "..."}
+      prompt: "{{args.task}}"
+      silent: true
+  - exec:
+      command: "{{output.command}}"
+      summary: "{{output.summary}}"
+      confirm: true
+```
+
+This also works with named steps: <code v-pre>{{steps.id.field}}</code>
+
+::: warning
+If the output is not valid JSON, accessing a field will cause an error. Use <code v-pre>{{output}}</code> (without a field) for raw output.
+:::
+
 ### Named step output
 
 Give a step an `id` to reference its output specifically:
@@ -175,8 +198,10 @@ steps:
 | Variable | Source | Description |
 |----------|--------|-------------|
 | `{{args.name}}` | User input | Named argument value |
-| `{{output}}` | Previous step | Output from the previous step |
-| `{{steps.id.output}}` | Named step | Output from a specific step |
+| `{{output}}` | Previous step | Raw output from the previous step |
+| `{{output.field}}` | Previous step | JSON field from the previous step (errors if not JSON) |
+| `{{steps.id.output}}` | Named step | Raw output from a specific step |
+| `{{steps.id.field}}` | Named step | JSON field from a specific step |
 | `{{directory}}` | Runtime | Current working directory |
 | `{{os}}` | Runtime | Operating system (`linux`, `darwin`, `windows`) |
 | `{{arch}}` | Runtime | CPU architecture |

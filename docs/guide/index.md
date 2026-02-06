@@ -65,11 +65,11 @@ Commands you want everywhere go in your global config:
 
 Run `x commands` to open it in your editor.
 
-## Pre-installed commands
+## Built-in commands
 
-The global config comes with two commands already defined:
+Two commands are built into the binary and always available:
 
-**shell** - Generate shell commands from plain English:
+**shell** - Generate shell commands from plain English (with safety info):
 ```bash
 x find files larger than 100mb
 ```
@@ -79,7 +79,7 @@ x find files larger than 100mb
 x new "a command that compresses all images"
 ```
 
-These are just regular commands defined in YAML. You can modify them, delete them, or add your own.
+These are automatically updated when you upgrade `x`. You can override them in your config if you want custom behavior.
 
 ## The default command
 
@@ -112,12 +112,13 @@ Configure AI with `x configure`. Skip it if you only need the command runner.
 
 When you run `x build`:
 
-1. Check **built-in commands** (`configure`, `commands`, `usage`, `upgrade`, `version`)
-2. Check **global config** (`~/.config/x/commands.yaml`)
-3. Check **project configs** (all `xcommands.yaml` files from root to current directory)
-4. If no match, use the **default command** (if set)
+1. Check **CLI commands** (`configure`, `commands`, `usage`, `upgrade`, `version`)
+2. Check **built-in commands** (`shell`, `new` - embedded in the binary)
+3. Check **global config** (`~/.config/x/commands.yaml`)
+4. Check **project configs** (all `xcommands.yaml` files from root to current directory)
+5. If no match, use the **default command** (if set)
 
-Later configs override earlier ones. A project's `build` command overrides a global `build`.
+Later configs override earlier ones. A project's `build` command overrides a global `build`. You can also override built-in commands in your config.
 
 Run `x --help` to see all available commands and where they come from.
 

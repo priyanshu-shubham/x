@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,183 +10,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const commandsTemplate = `# X CLI Commands Configuration
-#
-# Define custom commands with step-based pipelines.
-# Each step can be: exec (shell), llm (single call), or agentic (multi-turn loop).
-#
-# Template variables available in prompts:
-#   {{time}}      - Current time (HH:MM:SS)
-#   {{date}}      - Current date (YYYY-MM-DD)
-#   {{datetime}}  - Current date and time
-#   {{directory}} - Current working directory
-#   {{os}}        - Operating system (darwin, linux, windows)
-#   {{arch}}      - Architecture (amd64, arm64)
-#   {{shell}}     - User's shell
-#   {{user}}      - Current username
-#
-# Step-specific variables:
-#   {{args.<name>}}         - Named argument value
-#   {{output}}              - Output from previous step
-#   {{steps.<id>.output}}   - Output from a specific named step
-#
-# OS-specific exec commands:
-#   exec:
-#     command: "cat file"    # Default (used if no OS match)
-#     windows: "type file"   # Windows-specific
-#     darwin: "cat file"     # macOS-specific
-#     linux: "cat file"      # Linux-specific
-#
-# Default command (runs when no command matches):
-default: shell
-
-# Shell command generation (the default behavior)
-shell:
-  description: Generate and run shell commands from natural language
-  args:
-    - name: query
-      description: What you want to do
-      rest: true
-  steps:
-    - llm:
-        system: |
-          You are a command-line assistant. Generate the appropriate shell command.
-          Environment: {{os}}, {{arch}}, {{directory}}, {{shell}}
-          Rules: Output ONLY the command, no explanations, no markdown.
-        prompt: "{{args.query}}"
-        silent: true
-    - exec:
-        command: "{{output}}"
-        confirm: true
-
-# Create new commands using AI
-new:
-  description: Create a new command with AI assistance
-  args:
-    - name: description
-      description: What the new command should do
-      rest: true
-  steps:
-    - id: current
-      exec:
-        command: "cat ~/.config/x/commands.yaml"
-        darwin: "cat ~/Library/Application\\ Support/x/commands.yaml"
-        windows: "type %LOCALAPPDATA%\\x\\commands.yaml"
-        silent: true
-    - agentic:
-        system: |
-          You are a helper that creates new commands for the x CLI tool.
-
-          YAML SCHEMA FOR COMMANDS:
-
-          command-name:
-            description: Short description shown in help
-            args:                          # Optional: define named arguments
-              - name: argname              # Referenced as args.argname in double braces
-                description: What this arg is for
-                rest: true                 # Optional: captures all remaining args
-            steps:                         # List of steps to execute in order
-              - llm:                       # Single LLM call
-                  system: "System prompt"
-                  prompt: "User prompt"
-              - exec:                      # Shell command
-                  command: "default cmd"   # Required: default command
-                  windows: "win cmd"       # Optional: Windows-specific
-                  darwin: "mac cmd"        # Optional: macOS-specific
-                  linux: "linux cmd"       # Optional: Linux-specific
-                  confirm: true            # Optional: ask before running (default: false)
-              - agentic:                   # Multi-turn with shell access
-                  system: "System prompt"
-                  prompt: "User prompt"
-                  max_iterations: 10       # Optional (default: 10)
-                  auto_execute: false      # Optional: auto-run commands (default: false)
-
-          AVAILABLE TEMPLATE VARIABLES (use double curly braces):
-          - args.<name> - Named argument value
-          - output - Output from previous step
-          - steps.<id>.output - Output from named step (give step an id: field)
-          - directory, os, arch, shell, user - Environment info
-          - time, date, datetime - Current time/date
-
-          STEP TYPES:
-          1. llm: Single AI call. Good for text generation, explanations, summaries.
-          2. exec: Run shell command. Use for reading files, running tools. Add OS variants for cross-platform.
-          3. agentic: Multi-turn AI loop with shell access. Good for complex tasks needing multiple commands.
-
-          COMMON PATTERNS:
-          - Read file then analyze: exec (cat file) -> llm (analyze the output variable)
-          - Generate and run: llm (generate command) -> exec with confirm: true
-          - Complex task: agentic with auto_execute: false for safety
-
-          RULES:
-          1. Create valid YAML that can be appended to the commands file
-          2. Use descriptive names (kebab-case)
-          3. Write clear descriptions for help text
-          4. Use OS-specific commands when needed (cat vs type, grep vs findstr)
-          5. For dangerous operations, use confirm: true or auto_execute: false
-          6. Keep system prompts short and concise - no fluff, just clear instructions
-
-          Current OS: {{os}}
-          Config file location:
-          - Linux: ~/.config/x/commands.yaml
-          - macOS: ~/Library/Application Support/x/commands.yaml
-          - Windows: %LOCALAPPDATA%\x\commands.yaml
-
-          After creating the YAML, append it to the config file using echo/cat or appropriate command.
-        prompt: |
-          Create a new command for: {{args.description}}
-
-          Current commands.yaml content:
-          {{steps.current.output}}
-        max_iterations: 10
-        auto_execute: false
-
-# Example: Simple LLM command
-# paraphrase:
-#   description: Paraphrase text to be clearer and more professional
-#   args:
-#     - name: text
-#       description: Text to paraphrase
-#       rest: true
-#   steps:
-#     - llm:
-#         system: |
-#           You are a writing assistant. Paraphrase the text clearly and professionally.
-#           Output ONLY the paraphrased text.
-#         prompt: "{{args.text}}"
-
-# Example: Multi-step with file reading (cross-platform)
-# analyze:
-#   description: Analyze a code file
-#   args:
-#     - name: file
-#       description: Path to the file to analyze
-#   steps:
-#     - id: read
-#       exec:
-#         command: "cat {{args.file}}"
-#         windows: "type {{args.file}}"
-#     - llm:
-#         system: "You are a code analyst. Analyze the code and provide insights."
-#         prompt: "{{output}}"
-
-# Example: Agentic workflow
-# fix:
-#   description: Automatically fix issues in code
-#   args:
-#     - name: task
-#       description: What to fix
-#       rest: true
-#   steps:
-#     - agentic:
-#         system: |
-#           You are a code fixer. Analyze and fix issues in the codebase.
-#           Use shell commands to read/write files as needed.
-#           Current directory: {{directory}}
-#         prompt: "{{args.task}}"
-#         max_iterations: 10
-#         auto_execute: false
-`
+//go:embed commands.template.yaml
+var commandsTemplate string
 
 // Step types for pipeline execution
 
@@ -197,6 +23,9 @@ type ExecStep struct {
 	Linux   string `yaml:"linux"`           // Linux-specific command
 	Confirm bool   `yaml:"confirm"`         // Prompt before execution
 	Silent  bool   `yaml:"silent"`          // Don't print output (for intermediate steps)
+	Summary string `yaml:"summary"`         // Optional: description shown before confirm
+	Risk    string `yaml:"risk"`            // Optional: risk level shown before confirm (none/low/medium/high)
+	Safer   string `yaml:"safer"`           // Optional: safer alternative shown for risky commands
 }
 
 // LLMStep makes a single LLM call
@@ -299,16 +128,26 @@ func findAllLocalCommandsFiles() []string {
 
 // LoadCommandsConfig reads and merges command configurations.
 // Configs are merged with this precedence (later overrides earlier):
-// 1. Global commands.yaml
-// 2. Parent xcommands.yaml files (from root to current directory)
-// 3. Local xcommands.yaml (in current directory)
+// 1. Built-in commands (shell, new) - always up-to-date
+// 2. Global commands.yaml
+// 3. Parent xcommands.yaml files (from root to current directory)
+// 4. Local xcommands.yaml (in current directory)
 func LoadCommandsConfig() (*CommandsConfig, error) {
 	config := &CommandsConfig{
 		Default:  "shell",
 		Commands: make(map[string]Command),
 	}
 
-	// Load global config first
+	// Load built-in commands first (always current, can be overridden)
+	builtins, err := getBuiltinCommands()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load built-in commands: %w", err)
+	}
+	for name, cmd := range builtins {
+		config.Commands[name] = cmd
+	}
+
+	// Load global config (can override built-ins)
 	globalPath, err := getCommandsPath()
 	if err != nil {
 		return nil, err
@@ -450,12 +289,20 @@ func PrintHelp(config *CommandsConfig) {
 			bySource[cmd.Source] = append(bySource[cmd.Source], name)
 		}
 
-		// Sort sources: global first, then others alphabetically
+		// Sort sources: built-in first, then global, then others alphabetically
 		var sources []string
 		for source := range bySource {
 			sources = append(sources, source)
 		}
 		sort.Slice(sources, func(i, j int) bool {
+			// built-in comes first
+			if sources[i] == "built-in" {
+				return true
+			}
+			if sources[j] == "built-in" {
+				return false
+			}
+			// global comes second
 			if sources[i] == "global" {
 				return true
 			}

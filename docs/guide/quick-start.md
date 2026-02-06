@@ -115,16 +115,16 @@ ip:
 
 Save and close. Now `x ip` works in any directory.
 
-## 5. See how the pre-installed commands work
+## 5. Learn about the built-in commands
 
-The `shell` and `new` commands are just regular commands defined in your global config. Check them out:
+The `shell` and `new` commands are built into the binary and always up-to-date:
 
 ```bash
-x shell --help    # See description
-x commands        # See the full YAML
+x shell --help    # See description and usage
+x --help          # See all commands and their sources
 ```
 
-You can modify them or use them as templates for your own commands.
+You can override them in your config if you want custom behavior, but the built-in versions are automatically updated when you upgrade `x`.
 
 ## Useful commands
 

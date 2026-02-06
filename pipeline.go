@@ -52,6 +52,41 @@ func debugPrompt(label, content string) {
 	}
 }
 
+// isRiskyCommand returns true if the risk level is medium or high
+func isRiskyCommand(risk string) bool {
+	riskLower := strings.ToLower(risk)
+	return strings.HasPrefix(riskLower, "medium") || strings.HasPrefix(riskLower, "high")
+}
+
+// printConfirmInfo prints summary, risk, and safer alternative before confirmation
+func printConfirmInfo(summary, risk, safer string) {
+	// Print summary if present
+	if summary != "" {
+		fmt.Printf("\n\033[1mSummary:\033[0m %s\n", summary)
+	}
+
+	// Only show risk and safer alternative for medium/high risk commands
+	if isRiskyCommand(risk) {
+		// Print risk with color coding
+		riskLower := strings.ToLower(risk)
+		var color string
+		switch {
+		case strings.HasPrefix(riskLower, "medium"):
+			color = "\033[38;5;208m" // Orange
+		case strings.HasPrefix(riskLower, "high"):
+			color = "\033[31m" // Red
+		default:
+			color = "\033[0m"
+		}
+		fmt.Printf("\033[1mRisk:\033[0m %s%s\033[0m\n", color, risk)
+
+		// Print safer alternative if present
+		if safer != "" {
+			fmt.Printf("\033[1mSafer alternative:\033[0m %s\n", safer)
+		}
+	}
+}
+
 // PipelineContext tracks state during pipeline execution
 type PipelineContext struct {
 	Args        map[string]string // Parsed argument name -> value
@@ -185,27 +220,66 @@ func getOSCommand(step *ExecStep) string {
 // If captureOutput is true, always captures output (for command chaining)
 func runExecStep(ctx *PipelineContext, step *ExecStep, isLastStep bool, captureOutput bool) (string, error) {
 	command := getOSCommand(step)
-	command = interpolateVariables(command, ctx)
+	var err error
+	command, err = interpolateVariables(command, ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to interpolate command: %w", err)
+	}
 
 	debugLog("Command: %s", command)
 	debugLog("Confirm: %v, Silent: %v, IsLastStep: %v, CaptureOutput: %v", step.Confirm, step.Silent, isLastStep, captureOutput)
 
 	if isDryRun() {
 		fmt.Printf("[DRYRUN] Would execute: %s\n", command)
+		// Show optional fields if present
+		if step.Summary != "" {
+			summary, _ := interpolateVariables(step.Summary, ctx)
+			if summary != "" {
+				fmt.Printf("[DRYRUN] Summary: %s\n", summary)
+			}
+		}
+		if step.Risk != "" {
+			risk, _ := interpolateVariables(step.Risk, ctx)
+			if risk != "" {
+				fmt.Printf("[DRYRUN] Risk: %s\n", risk)
+			}
+		}
 		return "[dry run - no output]", nil
 	}
 
 	if step.Confirm {
+		// Interpolate optional summary/risk/safer fields
+		summary, _ := interpolateVariables(step.Summary, ctx)
+		risk, _ := interpolateVariables(step.Risk, ctx)
+		safer, _ := interpolateVariables(step.Safer, ctx)
+
+		// Display confirmation info
+		printConfirmInfo(summary, risk, safer)
 		printCommandForConfirm(command)
-		fmt.Print("Run this command? [Y/n]: ")
 
 		reader := bufio.NewReader(os.Stdin)
-		response, _ := reader.ReadString('\n')
-		response = strings.TrimSpace(strings.ToLower(response))
+		isHighRisk := isRiskyCommand(risk)
 
-		if response != "" && response != "y" && response != "yes" {
-			fmt.Println("Cancelled.")
-			os.Exit(0)
+		if isHighRisk {
+			// For medium/high risk: default to No, require explicit Y
+			fmt.Print("Run this command? [y/N]: ")
+			response, _ := reader.ReadString('\n')
+			response = strings.TrimSpace(strings.ToLower(response))
+
+			if response != "y" && response != "yes" {
+				fmt.Println("Cancelled.")
+				os.Exit(0)
+			}
+		} else {
+			// For none/low risk: default to Yes
+			fmt.Print("Run this command? [Y/n]: ")
+			response, _ := reader.ReadString('\n')
+			response = strings.TrimSpace(strings.ToLower(response))
+
+			if response == "n" || response == "no" {
+				fmt.Println("Cancelled.")
+				os.Exit(0)
+			}
 		}
 		fmt.Println()
 	}
@@ -245,10 +319,16 @@ func runExecStep(ctx *PipelineContext, step *ExecStep, isLastStep bool, captureO
 
 // runLLMStep executes a single LLM call step
 func runLLMStep(client anthropic.Client, authType AuthType, ctx *PipelineContext, step *LLMStep) (string, error) {
-	systemPrompt := interpolateVariables(step.System, ctx)
+	systemPrompt, err := interpolateVariables(step.System, ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to interpolate system prompt: %w", err)
+	}
 	systemPrompt = ApplyTemplate(systemPrompt)
 
-	prompt := interpolateVariables(step.Prompt, ctx)
+	prompt, err := interpolateVariables(step.Prompt, ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to interpolate user prompt: %w", err)
+	}
 	prompt = ApplyTemplate(prompt)
 
 	debugPrompt("System prompt", systemPrompt)
@@ -276,10 +356,16 @@ func runLLMStep(client anthropic.Client, authType AuthType, ctx *PipelineContext
 
 // runAgenticStep executes a multi-turn agentic loop
 func runAgenticStep(client anthropic.Client, authType AuthType, ctx *PipelineContext, step *AgenticStep) (string, error) {
-	systemPrompt := interpolateVariables(step.System, ctx)
+	systemPrompt, err := interpolateVariables(step.System, ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to interpolate system prompt: %w", err)
+	}
 	systemPrompt = ApplyTemplate(systemPrompt)
 
-	prompt := interpolateVariables(step.Prompt, ctx)
+	prompt, err := interpolateVariables(step.Prompt, ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to interpolate user prompt: %w", err)
+	}
 	prompt = ApplyTemplate(prompt)
 
 	maxIterations := step.MaxIterations
@@ -400,7 +486,10 @@ func runSubcommandStep(client anthropic.Client, authType AuthType, config *Comma
 	// Interpolate args
 	var args []string
 	for _, arg := range step.Args {
-		interpolated := interpolateVariables(arg, ctx)
+		interpolated, err := interpolateVariables(arg, ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to interpolate arg %q: %w", arg, err)
+		}
 		interpolated = ApplyTemplate(interpolated)
 		args = append(args, interpolated)
 	}
@@ -481,7 +570,9 @@ func trackUsage(usage anthropic.Usage) {
 }
 
 // interpolateVariables replaces {{args.X}}, {{output}}, and {{steps.X.output}} placeholders
-func interpolateVariables(text string, ctx *PipelineContext) string {
+func interpolateVariables(text string, ctx *PipelineContext) (string, error) {
+	var interpolateErr error
+
 	// Replace {{args.name}} patterns
 	argsPattern := regexp.MustCompile(`\{\{args\.([a-zA-Z_][a-zA-Z0-9_]*)\}\}`)
 	text = argsPattern.ReplaceAllStringFunc(text, func(match string) string {
@@ -493,24 +584,121 @@ func interpolateVariables(text string, ctx *PipelineContext) string {
 		return match // Keep original if not found
 	})
 
-	// Replace {{steps.id.output}} patterns
-	stepsPattern := regexp.MustCompile(`\{\{steps\.([a-zA-Z_][a-zA-Z0-9_]*)\.output\}\}`)
+	// Replace {{steps.id.field}} patterns (including {{steps.id.output}})
+	stepsPattern := regexp.MustCompile(`\{\{steps\.([a-zA-Z_][a-zA-Z0-9_-]*)\.([a-zA-Z_][a-zA-Z0-9_]*)\}\}`)
 	text = stepsPattern.ReplaceAllStringFunc(text, func(match string) string {
-		// Extract step ID
-		parts := strings.Split(match[2:len(match)-2], ".") // Remove "{{" and "}}"
-		if len(parts) >= 2 {
-			stepID := parts[1]
-			if output, ok := ctx.StepOutputs[stepID]; ok {
-				return output
-			}
+		if interpolateErr != nil {
+			return match
 		}
-		return match // Keep original if not found
+		// Extract step ID and field
+		parts := strings.Split(match[2:len(match)-2], ".") // Remove "{{" and "}}"
+		if len(parts) >= 3 {
+			stepID := parts[1]
+			field := parts[2]
+			output, ok := ctx.StepOutputs[stepID]
+			if !ok {
+				return match // Keep original if step not found
+			}
+			if field == "output" {
+				return output // Raw output
+			}
+			// Try to parse as JSON and extract field
+			value, err := extractJSONField(output, field)
+			if err != nil {
+				interpolateErr = fmt.Errorf("cannot access {{steps.%s.%s}}: %w", stepID, field, err)
+				return match
+			}
+			return value
+		}
+		return match
 	})
 
-	// Replace {{output}} with last output
+	if interpolateErr != nil {
+		return "", interpolateErr
+	}
+
+	// Replace {{output.field}} patterns (JSON field access)
+	outputFieldPattern := regexp.MustCompile(`\{\{output\.([a-zA-Z_][a-zA-Z0-9_]*)\}\}`)
+	text = outputFieldPattern.ReplaceAllStringFunc(text, func(match string) string {
+		if interpolateErr != nil {
+			return match
+		}
+		field := match[9 : len(match)-2] // Remove "{{output." and "}}"
+		value, err := extractJSONField(ctx.LastOutput, field)
+		if err != nil {
+			interpolateErr = fmt.Errorf("cannot access {{output.%s}}: %w", field, err)
+			return match
+		}
+		return value
+	})
+
+	if interpolateErr != nil {
+		return "", interpolateErr
+	}
+
+	// Replace {{output}} with last output (raw)
 	text = strings.ReplaceAll(text, "{{output}}", ctx.LastOutput)
 
-	return text
+	return text, nil
+}
+
+// extractJSONField parses a JSON string and extracts a field value
+func extractJSONField(jsonStr, field string) (string, error) {
+	// Strip markdown code blocks if present (```json ... ``` or ``` ... ```)
+	jsonStr = stripMarkdownCodeBlock(jsonStr)
+
+	var data map[string]any
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return "", fmt.Errorf("output is not valid JSON: %w", err)
+	}
+
+	value, ok := data[field]
+	if !ok {
+		return "", fmt.Errorf("field %q not found in JSON", field)
+	}
+
+	// Convert value to string
+	switch v := value.(type) {
+	case string:
+		return v, nil
+	case float64:
+		return fmt.Sprintf("%v", v), nil
+	case bool:
+		return fmt.Sprintf("%v", v), nil
+	case nil:
+		return "", nil
+	default:
+		// For complex types, marshal back to JSON
+		bytes, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		return string(bytes), nil
+	}
+}
+
+// stripMarkdownCodeBlock removes markdown code block syntax from a string
+// Handles ```json ... ```, ```... ```, and plain content
+func stripMarkdownCodeBlock(s string) string {
+	s = strings.TrimSpace(s)
+
+	// Check for code block with language identifier (```json, ```javascript, etc.)
+	if strings.HasPrefix(s, "```") {
+		// Find the end of the first line (the opening ```)
+		firstNewline := strings.Index(s, "\n")
+		if firstNewline == -1 {
+			return s // No newline, return as-is
+		}
+
+		// Find the closing ```
+		lastBackticks := strings.LastIndex(s, "```")
+		if lastBackticks > firstNewline {
+			// Extract content between opening line and closing ```
+			return strings.TrimSpace(s[firstNewline+1 : lastBackticks])
+		}
+	}
+
+	return s
 }
 
 // printExecCommand prints the command being executed in a formatted way

@@ -20,6 +20,9 @@ steps:
 | `linux` | string | - | Override command for Linux |
 | `silent` | boolean | `false` | Capture output without printing |
 | `confirm` | boolean | `false` | Ask before running |
+| `summary` | string | - | Description shown before confirm (supports interpolation) |
+| `risk` | string | - | Risk level: `none`, `low`, `medium`, `high` |
+| `safer` | string | - | Safer alternative shown for risky commands |
 
 ## OS-specific commands
 
@@ -69,6 +72,48 @@ Run this command? [Y/n]:
 ```
 
 Useful for destructive commands.
+
+## Smart confirmation with safety info
+
+Add `summary`, `risk`, and `safer` fields to show safety information before confirmation:
+
+```yaml
+steps:
+  - llm:
+      system: |
+        Generate a command. Return JSON:
+        {"command": "...", "summary": "...", "risk": "none|low|medium|high", "safer": "..."}
+      prompt: "{{args.task}}"
+      silent: true
+  - exec:
+      command: "{{output.command}}"
+      summary: "{{output.summary}}"
+      risk: "{{output.risk}}"
+      safer: "{{output.safer}}"
+      confirm: true
+```
+
+Output for a risky command:
+```
+Summary: Force kills process 1234 immediately without cleanup
+Risk: high - process won't have chance to save state
+Safer alternative: kill -15 1234 (sends SIGTERM for graceful shutdown)
+
+┃ kill -9 1234
+
+Run this command? [y/N]:
+```
+
+### Risk-based defaults
+
+The confirmation prompt changes based on risk level:
+
+| Risk Level | Prompt | Default |
+|------------|--------|---------|
+| `none`, `low` | `[Y/n]` | Yes (press Enter to run) |
+| `medium`, `high` | `[y/N]` | No (must type 'y' to run) |
+
+For low-risk commands, only the summary is shown (risk and safer are hidden).
 
 ## Variable interpolation
 

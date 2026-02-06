@@ -13,6 +13,8 @@
 ```
 $ x find files modified in the last day
 
+Summary: Finds all regular files modified within the last 24 hours
+
 ┃ find . -mtime -1 -type f
 
 Run this command? [Y/n]:
@@ -163,8 +165,15 @@ steps:
 - `windows`, `darwin`, `linux` - OS-specific overrides
 - `silent: true` - capture output without printing it
 - `confirm: true` - ask before running
+- `summary` - description shown before confirm (supports interpolation)
+- `risk` - risk level: `none`, `low`, `medium`, `high`
+- `safer` - safer alternative shown for risky commands
 
 When `silent` is false (the default), output streams to your terminal in real-time.
+
+**Smart confirmation:** When `confirm: true` with `risk` set, the prompt changes based on risk level:
+- `none`/`low`: Defaults to Yes (`[Y/n]`)
+- `medium`/`high`: Defaults to No (`[y/N]`), requires explicit confirmation
 
 ### 2. `llm` - Call Claude
 
@@ -291,8 +300,10 @@ Use these anywhere in your prompts:
 | Variable | What it contains |
 |----------|------------------|
 | `{{args.name}}` | Argument passed by the user |
-| `{{output}}` | Output from the previous step |
+| `{{output}}` | Raw output from the previous step |
+| `{{output.field}}` | JSON field from previous step (if output is JSON) |
 | `{{steps.id.output}}` | Output from a specific named step |
+| `{{steps.id.field}}` | JSON field from a named step |
 | `{{directory}}` | Current working directory |
 | `{{os}}` | Operating system (darwin, linux, windows) |
 | `{{arch}}` | CPU architecture |
@@ -352,31 +363,26 @@ All configs are merged together. If you're in `/projects/myapp/src/`, x loads:
 
 Later files override earlier ones.
 
-**Setting a default command:**
+**Built-in commands:**
 
-Add `default: <name>` at the top of your config to run that command when no command matches:
-
-```yaml
-default: shell
-
-shell:
-  description: Generate shell commands
-  # ...
-```
-
-Now `x find large files` runs the `shell` command with "find large files" as input.
+The `shell` and `new` commands are built into the binary and always up-to-date. You don't need to define them - they're automatically available and updated when you upgrade `x`.
 
 Run `x --help` to see where each command comes from:
 
 ```
-Commands (global):
+Commands (built-in):
   shell  Generate and run shell commands from natural language (default)
   new    Create a new command with AI assistance
+
+Commands (global):
+  mycommand  A custom command you added
 
 Commands (myapp):
   build  Build the project
   test   Run tests
 ```
+
+You can override built-in commands in your config if you want custom behavior.
 
 ---
 

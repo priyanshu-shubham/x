@@ -1,0 +1,107 @@
+# X CLI Commands Configuration
+#
+# Define custom commands with step-based pipelines.
+# Each step can be: exec (shell), llm (single call), or agentic (multi-turn loop).
+#
+# Built-in commands (shell, new) are always available and kept up-to-date.
+# You can override them here if you want custom behavior.
+#
+# Template variables available in prompts:
+#   {{time}}      - Current time (HH:MM:SS)
+#   {{date}}      - Current date (YYYY-MM-DD)
+#   {{datetime}}  - Current date and time
+#   {{directory}} - Current working directory
+#   {{os}}        - Operating system (darwin, linux, windows)
+#   {{arch}}      - Architecture (amd64, arm64)
+#   {{shell}}     - User's shell
+#   {{user}}      - Current username
+#
+# Step-specific variables:
+#   {{args.<name>}}         - Named argument value
+#   {{output}}              - Raw output from previous step
+#   {{output.<field>}}      - JSON field from previous step (errors if not JSON)
+#   {{steps.<id>.output}}   - Output from a specific named step
+#   {{steps.<id>.<field>}}  - JSON field from a named step
+#
+# OS-specific exec commands:
+#   exec:
+#     command: "cat file"    # Default (used if no OS match)
+#     windows: "type file"   # Windows-specific
+#     darwin: "cat file"     # macOS-specific
+#     linux: "cat file"      # Linux-specific
+#
+# Exec step options for confirmation:
+#   exec:
+#     command: "..."
+#     confirm: true          # Ask before running
+#     summary: "..."         # Description shown before confirm (supports interpolation)
+#     risk: "..."            # Risk level: none, low, medium, high
+#     safer: "..."           # Safer alternative for risky commands
+#
+# Default command (runs when no command matches):
+default: shell
+
+# Example: Simple LLM command
+# paraphrase:
+#   description: Paraphrase text to be clearer and more professional
+#   args:
+#     - name: text
+#       description: Text to paraphrase
+#       rest: true
+#   steps:
+#     - llm:
+#         system: |
+#           You are a writing assistant. Paraphrase the text clearly and professionally.
+#           Output ONLY the paraphrased text.
+#         prompt: "{{args.text}}"
+
+# Example: Multi-step with file reading (cross-platform)
+# analyze:
+#   description: Analyze a code file
+#   args:
+#     - name: file
+#       description: Path to the file to analyze
+#   steps:
+#     - id: read
+#       exec:
+#         command: "cat {{args.file}}"
+#         windows: "type {{args.file}}"
+#     - llm:
+#         system: "You are a code analyst. Analyze the code and provide insights."
+#         prompt: "{{output}}"
+
+# Example: Agentic workflow
+# fix:
+#   description: Automatically fix issues in code
+#   args:
+#     - name: task
+#       description: What to fix
+#       rest: true
+#   steps:
+#     - agentic:
+#         system: |
+#           You are a code fixer. Analyze and fix issues in the codebase.
+#           Use shell commands to read/write files as needed.
+#           Current directory: {{directory}}
+#         prompt: "{{args.task}}"
+#         max_iterations: 10
+#         auto_execute: false
+
+# Example: LLM with JSON output and confirmation
+# run:
+#   description: Generate and run a command with safety info
+#   args:
+#     - name: task
+#       rest: true
+#   steps:
+#     - llm:
+#         system: |
+#           Generate a shell command. Return JSON:
+#           {"command": "...", "summary": "...", "risk": "none|low|medium|high"}
+#         prompt: "{{args.task}}"
+#         silent: true
+#     - exec:
+#         command: "{{output.command}}"
+#         summary: "{{output.summary}}"
+#         risk: "{{output.risk}}"
+#         confirm: true
